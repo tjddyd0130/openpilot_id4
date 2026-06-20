@@ -52,6 +52,12 @@ class VCruiseHelperSP:
     self.short_increment = self.params.get("CustomAccShortPressIncrement", return_default=True)
     self.long_increment = self.params.get("CustomAccLongPressIncrement", return_default=True)
 
+    # tjddyd VW MEB opt-in convenience features (gated to MEB via self.is_meb, set by card.py)
+    self.is_meb = False
+    self.gra_tip_stufe2 = False
+    self.auto_gas_sync = self.params.get_bool("AutoGasSyncSpeed")
+    self.stalk_big_step = self.params.get_bool("EnableStalkBigStep")
+
     self.enable_button_timers = CRUISE_BUTTON_TIMER
 
     # Speed Limit Assist
@@ -68,6 +74,9 @@ class VCruiseHelperSP:
     self.custom_acc_enabled = self.params.get_bool("CustomAccIncrementsEnabled")
     self.short_increment = self.params.get("CustomAccShortPressIncrement", return_default=True)
     self.long_increment = self.params.get("CustomAccLongPressIncrement", return_default=True)
+    # tjddyd VW MEB opt-in convenience features
+    self.auto_gas_sync = self.params.get_bool("AutoGasSyncSpeed")
+    self.stalk_big_step = self.params.get_bool("EnableStalkBigStep")
 
   def update_v_cruise_delta(self, long_press: bool, v_cruise_delta: float) -> tuple[bool, float]:
     if not self.custom_acc_enabled:

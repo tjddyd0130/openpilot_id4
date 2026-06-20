@@ -44,8 +44,9 @@ class VCruiseHelper(VCruiseHelperSP):
   def v_cruise_initialized(self):
     return self.v_cruise_kph != V_CRUISE_UNSET
 
-  def update_v_cruise(self, CS, enabled, is_metric, speed_limit_control=False, speed_limit_predicative=False):
+  def update_v_cruise(self, CS, enabled, is_metric, speed_limit_control=False, speed_limit_predicative=False, gra_tip_stufe2=False):
     self.v_cruise_kph_last = self.v_cruise_kph
+    self.gra_tip_stufe2 = gra_tip_stufe2  # tjddyd VW MEB: cruise stalk 2nd detent (big step)
 
     self.get_minimum_set_speed(is_metric)
 
@@ -57,6 +58,7 @@ class VCruiseHelper(VCruiseHelperSP):
         self._update_v_speed_limit(CS, _enabled, speed_limit_control, speed_limit_predicative)
         self._update_v_cruise_non_pcm(CS, _enabled, is_metric)
         self.update_speed_limit_assist_v_cruise_non_pcm()
+        self._update_auto_gas_sync(CS, _enabled)
         self.v_cruise_cluster_kph = self.v_cruise_kph
       else:
         self.v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
@@ -131,6 +133,12 @@ class VCruiseHelper(VCruiseHelperSP):
     if self.update_speed_limit_assist_pre_active_confirmed(button_type):
       return
 
+    # tjddyd VW MEB opt-in: cruise stalk 2nd detent (GRA_Tip_Stufe_2) forces a big step.
+    # Only effective with openpilot longitudinal control (pcmCruise=False).
+    if (self.stalk_big_step and self.is_meb and self.gra_tip_stufe2 and
+        button_type in (ButtonType.accelCruise, ButtonType.decelCruise)):
+      long_press = True
+
     long_press, v_cruise_delta = VCruiseHelperSP.update_v_cruise_delta(self, long_press, v_cruise_delta)
     if long_press and self.v_cruise_kph % v_cruise_delta != 0:  # partial interval
       self.v_cruise_kph = CRUISE_NEAREST_FUNC[button_type](self.v_cruise_kph / v_cruise_delta) * v_cruise_delta
@@ -142,6 +150,18 @@ class VCruiseHelper(VCruiseHelperSP):
       self.v_cruise_kph = max(self.v_cruise_kph, CS.vEgo * CV.MS_TO_KPH)
 
     self.v_cruise_kph = np.clip(round(self.v_cruise_kph, 1), self.v_cruise_min, V_CRUISE_MAX)
+
+  def _update_auto_gas_sync(self, CS, enabled):
+    # tjddyd VW MEB opt-in: while overriding with the accelerator, automatically sync the
+    # set speed up to current speed (without needing to press SET). Mirrors the existing
+    # gas+SET clip behaviour but applies continuously while gas is pressed.
+    # Only effective with openpilot longitudinal control (pcmCruise=False).
+    if not (self.auto_gas_sync and self.is_meb and enabled):
+      return
+    if CS.gasPressed:
+      v_ego_kph = CS.vEgo * CV.MS_TO_KPH
+      if v_ego_kph > self.v_cruise_kph:
+        self.v_cruise_kph = np.clip(round(v_ego_kph, 1), self.v_cruise_min, V_CRUISE_MAX)
 
   def update_button_timers(self, CS, enabled):
     # increment timer for buttons still pressed
