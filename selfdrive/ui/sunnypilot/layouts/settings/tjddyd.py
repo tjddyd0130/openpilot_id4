@@ -36,6 +36,12 @@ DESCRIPTIONS = {
     "set-speed step (rounded to 5). Requires openpilot longitudinal control "
     "(e.g. DEC enabled); has no effect with stock ACC."
   ),
+  "EnableWebTerminal": tr_noop(
+    "WARNING: Starts the carrot recovery web terminal on port 6999 while offroad. "
+    "Open http://<device-ip>:6999 in a browser for a terminal and git recovery UI. "
+    "This exposes an UNAUTHENTICATED root shell to anyone on the same network - only "
+    "enable on trusted networks. Takes effect after a reboot (or offroad restart)."
+  ),
 }
 
 
@@ -60,6 +66,11 @@ class TjddydLayout(Widget):
         lambda: tr("VW MEB: Stalk Big Step (2nd detent)"),
         DESCRIPTIONS["EnableStalkBigStep"],
         "speed_limit.png",
+      ),
+      "EnableWebTerminal": (
+        lambda: tr("Web Terminal on :6999 (USE AT OWN RISK)"),
+        DESCRIPTIONS["EnableWebTerminal"],
+        "chffr_wheel.png",
       ),
     }
 

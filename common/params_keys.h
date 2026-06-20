@@ -301,4 +301,5 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"DisableDriverMonitoring", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"AutoGasSyncSpeed", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"EnableStalkBigStep", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"EnableWebTerminal", {PERSISTENT | BACKUP, BOOL, "0"}},
 };
