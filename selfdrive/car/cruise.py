@@ -39,6 +39,7 @@ class VCruiseHelper(VCruiseHelperSP):
     self.button_timers = {ButtonType.decelCruise: 0, ButtonType.accelCruise: 0}
     self.button_change_states = {btn: {"standstill": False, "enabled": False} for btn in self.button_timers}
     self.v_speed_limit_kph = 0
+    self._gas_pressed_frames = 0  # tjddyd: gas-hold debounce for auto gas sync (carrot-style)
 
   @property
   def v_cruise_initialized(self):
@@ -152,14 +153,21 @@ class VCruiseHelper(VCruiseHelperSP):
     self.v_cruise_kph = np.clip(round(self.v_cruise_kph, 1), self.v_cruise_min, V_CRUISE_MAX)
 
   def _update_auto_gas_sync(self, CS, enabled):
-    # tjddyd VW MEB opt-in: while overriding with the accelerator, automatically sync the
-    # set speed up to current speed (without needing to press SET). Mirrors the existing
-    # gas+SET clip behaviour but applies continuously while gas is pressed.
-    # Only effective with openpilot longitudinal control (pcmCruise=False).
+    # tjddyd VW MEB opt-in (carrot AutoGasSyncSpeed): while overriding with the accelerator,
+    # automatically sync the set speed up to current speed (without needing to press SET).
+    # Matches carrot: only after the gas is held > ~0.4s (ignores brief taps) and uses the
+    # cluster speed. Only effective with openpilot longitudinal control (pcmCruise=False).
+    GAS_SYNC_HOLD_FRAMES = 40  # ~0.4s at 100Hz, matches carrot's _gas_tok_timer
+
+    if CS.gasPressed:
+      self._gas_pressed_frames += 1
+    else:
+      self._gas_pressed_frames = 0
+
     if not (self.auto_gas_sync and self.is_meb and enabled):
       return
-    if CS.gasPressed:
-      v_ego_kph = CS.vEgo * CV.MS_TO_KPH
+    if self._gas_pressed_frames > GAS_SYNC_HOLD_FRAMES:
+      v_ego_kph = CS.vEgoCluster * CV.MS_TO_KPH
       if v_ego_kph > self.v_cruise_kph:
         self.v_cruise_kph = np.clip(round(v_ego_kph, 1), self.v_cruise_min, V_CRUISE_MAX)
 
