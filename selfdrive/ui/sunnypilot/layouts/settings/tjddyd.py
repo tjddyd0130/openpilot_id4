@@ -42,6 +42,14 @@ DESCRIPTIONS = {
     "and git recovery UI. This exposes an UNAUTHENTICATED root shell to anyone on the "
     "same network - only enable on trusted networks. Takes effect after a reboot."
   ),
+  "Mads": tr_noop(
+    "Shortcut to MADS (Modular Assistive Driving System): keep steering (lateral) "
+    "engaged independently of cruise. Same setting as Steering > MADS."
+  ),
+  "DynamicExperimentalControl": tr_noop(
+    "Shortcut to Dynamic Experimental Control (DEC): automatically switch between "
+    "chill and experimental longitudinal as the scene requires. Same setting as Cruise > DEC."
+  ),
 }
 
 
@@ -71,6 +79,16 @@ class TjddydLayout(Widget):
         lambda: tr("Web Terminal on :6999 (USE AT OWN RISK)"),
         DESCRIPTIONS["EnableWebTerminal"],
         "chffr_wheel.png",
+      ),
+      "Mads": (
+        lambda: tr("MADS - Always-on Steering (shortcut)"),
+        DESCRIPTIONS["Mads"],
+        "chffr_wheel.png",
+      ),
+      "DynamicExperimentalControl": (
+        lambda: tr("Dynamic Experimental Control (shortcut)"),
+        DESCRIPTIONS["DynamicExperimentalControl"],
+        "speed_limit.png",
       ),
     }
 
