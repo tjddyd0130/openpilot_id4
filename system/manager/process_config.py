@@ -75,7 +75,7 @@ def use_copyparty(started, params, CP: car.CarParams) -> bool:
   return bool(params.get_bool("EnableCopyparty"))
 
 def use_web_terminal(started, params, CP: car.CarParams) -> bool:
-  # tjddyd opt-in: carrot recovery web terminal on :6999, offroad only
+  # tjddyd opt-in: carrot recovery web terminal on :6999, runs onroad and offroad
   return bool(params.get_bool("EnableWebTerminal"))
 
 def sunnylink_ready_shim(started, params, CP: car.CarParams) -> bool:
@@ -210,6 +210,6 @@ if os.path.exists("../../third_party/copyparty/copyparty-sfx.py"):
   procs += [NativeProcess("copyparty-sfx", "third_party/copyparty", ["./copyparty-sfx.py", *copyparty_args], and_(only_offroad, use_copyparty))]
 
 if os.path.exists("../../selfdrive/carrot/recovery/server.py"):
-  procs += [PythonProcess("recovery_web_terminal", "selfdrive.carrot.recovery.server", and_(only_offroad, use_web_terminal), enabled=not PC)]
+  procs += [PythonProcess("recovery_web_terminal", "selfdrive.carrot.recovery.server", use_web_terminal, enabled=not PC)]
 
 managed_processes = {p.name: p for p in procs}

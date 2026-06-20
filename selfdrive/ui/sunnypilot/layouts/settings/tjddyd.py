@@ -37,10 +37,10 @@ DESCRIPTIONS = {
     "(e.g. DEC enabled); has no effect with stock ACC."
   ),
   "EnableWebTerminal": tr_noop(
-    "WARNING: Starts the carrot recovery web terminal on port 6999 while offroad. "
-    "Open http://<device-ip>:6999 in a browser for a terminal and git recovery UI. "
-    "This exposes an UNAUTHENTICATED root shell to anyone on the same network - only "
-    "enable on trusted networks. Takes effect after a reboot (or offroad restart)."
+    "WARNING: Starts the carrot recovery web terminal on port 6999 (runs both while "
+    "driving and parked). Open http://<device-ip>:6999 in a browser for a terminal "
+    "and git recovery UI. This exposes an UNAUTHENTICATED root shell to anyone on the "
+    "same network - only enable on trusted networks. Takes effect after a reboot."
   ),
 }
 
