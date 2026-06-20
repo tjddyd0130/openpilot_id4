@@ -92,9 +92,16 @@ class SelfdriveD(CruiseHelper):
     # TODO: de-couple selfdrived with card/conflate on carState without introducing controls mismatches
     self.car_state_sock = messaging.sub_sock('carState', timeout=20)
 
+    # tjddyd opt-in (carrot DisableDM): when DM is disabled, the dmonitoringd/modeld
+    # processes are not started, so driverMonitoringState is never published. Ignore it
+    # in the alive/valid/freq checks so it doesn't block engagement. Reboot required.
+    self.disable_dm = self.params.get_int("DisableDM")
+
     ignore = self.sensor_packets + self.gps_packets + ['alertDebug', 'lateralManeuverPlan'] + ['modelDataV2SP']
     if not Params().get_bool("EnableCurvatureD"):
       ignore += ['liveCurvatureParameters']
+    if self.disable_dm > 0:
+      ignore += ['driverMonitoringState']
     if SIMULATION:
       ignore += ['driverCameraState', 'managerState']
     if REPLAY:
@@ -227,7 +234,7 @@ class SelfdriveD(CruiseHelper):
       self.events.add(EventName.resumeBlocked)
 
     # Handle DM
-    if not self.CP.notCar:
+    if not self.CP.notCar and self.disable_dm == 0:
       # Block engaging until ignition cycle after max number or time of distractions
       if self.sm['driverMonitoringState'].lockout and not self.dm_lockout_set:
         self.params.put_bool("DriverTooDistracted", True)

@@ -298,7 +298,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"TorqueParamsOverrideLatAccelFactor", {PERSISTENT | BACKUP, FLOAT, "2.5"}},
 
     // tjddyd VW ID.4 (MEB) opt-in convenience features (Phase 1)
-    {"DisableDriverMonitoring", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"DisableDM", {PERSISTENT | BACKUP, INT, "0"}},
     {"AutoGasSyncSpeed", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"EnableStalkBigStep", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"EnableWebTerminal", {PERSISTENT | BACKUP, BOOL, "0"}},

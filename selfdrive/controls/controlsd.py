@@ -70,6 +70,7 @@ class Controls(ControlsExt):
     self.smooth_steer = PT2Filter(46.0, 1.0, DT_CTRL)
     self.force_rhd_for_bsm = self.params.get_bool("ForceRHDForBSM")
     self.disable_car_steer_alerts = self.params.get_bool("DisableCarSteerAlerts")
+    self.disable_dm = self.params.get_int("DisableDM")  # tjddyd opt-in (carrot DisableDM)
 
     self.pose_calibrator = PoseCalibrator()
     self.calibrated_pose: Pose | None = None
@@ -111,6 +112,7 @@ class Controls(ControlsExt):
       self.force_rhd_for_bsm = self.params.get_bool("ForceRHDForBSM")
       self.enable_long_comfort_mode = self.params.get_bool("EnableLongComfortMode")
       self.disable_car_steer_alerts = self.params.get_bool("DisableCarSteerAlerts")
+      self.disable_dm = self.params.get_int("DisableDM")
   
   def state_control(self):
     CS = self.sm['carState']
@@ -285,7 +287,7 @@ class Controls(ControlsExt):
     cs.upAccelCmd = float(self.LoC.pid.p)
     cs.uiAccelCmd = float(self.LoC.pid.i)
     cs.ufAccelCmd = float(self.LoC.pid.f)
-    cs.forceDecel = bool((self.sm['driverMonitoringState'].alertLevel == log.DriverMonitoringState.AlertLevel.three) or
+    cs.forceDecel = bool((self.sm['driverMonitoringState'].alertLevel == log.DriverMonitoringState.AlertLevel.three and self.disable_dm == 0) or
                          (self.sm['selfdriveState'].state == State.softDisabling))
 
     lat_tuning = self.CP.lateralTuning.which()

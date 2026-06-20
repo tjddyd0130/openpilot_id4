@@ -5,7 +5,7 @@ These toggles only expose params. The runtime behaviour is gated to
 VW MEB (CP.brand == 'volkswagen' and CP.flags & VolkswagenFlags.MEB) in the
 controls code, so enabling them has no effect on other platforms.
 
-DisableDriverMonitoring is the exception: driver monitoring runs device-wide
+DisableDM is the exception: driver monitoring runs device-wide
 and cannot be gated per car, so its description carries a safety warning.
 """
 from openpilot.common.params import Params, UnknownKeyName
@@ -21,10 +21,12 @@ if gui_app.sunnypilot_ui():
 
 # Description constants
 DESCRIPTIONS = {
-  "DisableDriverMonitoring": tr_noop(
+  "DisableDM": tr_noop(
     "WARNING: Disables the driver monitoring system (attention alerts and forced "
-    "deceleration). This is device-wide and cannot be limited to a single car. "
-    "You remain fully responsible for the vehicle at all times. Use at your own risk."
+    "deceleration) using carrot's DisableDM mechanism: the DM model/daemon are not "
+    "started and DM events are suppressed. This is device-wide and cannot be limited "
+    "to a single car. You remain fully responsible for the vehicle at all times. "
+    "Takes effect after a reboot. Use at your own risk."
   ),
   "AutoGasSyncSpeed": tr_noop(
     "VW MEB only: When you press the accelerator above the set cruise speed, the set "
@@ -60,9 +62,9 @@ class TjddydLayout(Widget):
 
     # param, title, desc, icon
     self._toggle_defs = {
-      "DisableDriverMonitoring": (
-        lambda: tr("VW MEB: Disable Driver Monitoring (USE AT OWN RISK)"),
-        DESCRIPTIONS["DisableDriverMonitoring"],
+      "DisableDM": (
+        lambda: tr("Disable Driver Monitoring (USE AT OWN RISK)"),
+        DESCRIPTIONS["DisableDM"],
         "chffr_wheel.png",
       ),
       "AutoGasSyncSpeed": (
