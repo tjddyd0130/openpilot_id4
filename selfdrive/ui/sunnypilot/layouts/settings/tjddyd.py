@@ -52,6 +52,12 @@ DESCRIPTIONS = {
     "Shortcut to Dynamic Experimental Control (DEC): automatically switch between "
     "chill and experimental longitudinal as the scene requires. Same setting as Cruise > DEC."
   ),
+  "EnableTmapSpeedLimit": tr_noop(
+    "Use the T map / KakaoNavi phone navigation as the speed-limit and speed-camera "
+    "source (carrot SDI broadcast over UDP :7706). Enabling this also turns on Speed "
+    "Limit Control and sets the speed-limit policy to map-data, and disables the OSM "
+    "map download. The phone app must broadcast to the device. Takes effect after a reboot."
+  ),
 }
 
 
@@ -92,6 +98,11 @@ class TjddydLayout(Widget):
         DESCRIPTIONS["DynamicExperimentalControl"],
         "speed_limit.png",
       ),
+      "EnableTmapSpeedLimit": (
+        lambda: tr("TMAP/KakaoNavi Speed Limit (:7706)"),
+        DESCRIPTIONS["EnableTmapSpeedLimit"],
+        "speed_limit.png",
+      ),
     }
 
     self._toggles = {}
@@ -130,3 +141,12 @@ class TjddydLayout(Widget):
       self._params.put_bool(param, state)
     except UnknownKeyName:
       pass
+
+    # Enabling the TMAP source wires up the rest of the speed-limit pipeline so it
+    # "just works": turn on Speed Limit Control and route the resolver to map data.
+    if param == "EnableTmapSpeedLimit" and state:
+      try:
+        self._params.put_bool("EnableSpeedLimitControl", True)
+        self._params.put("SpeedLimitPolicy", "1")  # Policy.map_data_only
+      except UnknownKeyName:
+        pass
