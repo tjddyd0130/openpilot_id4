@@ -270,10 +270,11 @@ class TmapMapData(BaseMapData):
     return
 
   def get_current_speed_limit(self) -> float:
-    with self._lock:
-      if not self._fresh() or self.nRoadLimitSpeed < MIN_VALID_SPEED_LIMIT:
-        return 0.0
-      return float(self.nRoadLimitSpeed) * CV.KPH_TO_MS
+    # tjddyd (Korea, camera-centric): do NOT report the continuous road speed limit.
+    # Returning 0 means the resolver applies no speed-limit cap normally; it only
+    # switches to the camera/section limit (speedLimitAhead) when one is approaching,
+    # so the sign appears and the car decelerates only at speed-camera zones.
+    return 0.0
 
   def get_next_speed_limit_and_distance(self) -> tuple[float, float]:
     with self._lock:
