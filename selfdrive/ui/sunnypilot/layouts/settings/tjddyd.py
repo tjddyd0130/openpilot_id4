@@ -45,41 +45,37 @@ TMAP_OPTIONS = [
 # Description constants
 DESCRIPTIONS = {
   "DisableDM": tr_noop(
-    "WARNING: Disables the driver monitoring system (attention alerts and forced "
-    "deceleration) using carrot's DisableDM mechanism: the DM model/daemon are not "
-    "started and DM events are suppressed. This is device-wide and cannot be limited "
-    "to a single car. You remain fully responsible for the vehicle at all times. "
-    "Takes effect after a reboot. Use at your own risk."
+    "경고: 운전자 감시(주의 경고·강제감속)를 끕니다. 당근 DisableDM 방식 그대로 — DM "
+    "모델/데몬을 아예 실행하지 않고 DM 이벤트를 억제합니다. 디바이스 전역 설정이라 특정 "
+    "차종만 가릴 수 없습니다. 차량 통제 책임은 항상 운전자에게 있습니다. 재부팅 후 적용. "
+    "본인 책임 하에 사용하세요."
   ),
   "AutoGasSyncSpeed": tr_noop(
-    "VW MEB only: When you press the accelerator above the set cruise speed, the set "
-    "speed is automatically synced up to your current speed when you release. "
-    "Requires openpilot longitudinal control (e.g. DEC enabled); has no effect with stock ACC."
+    "VW MEB 전용: 가속 페달을 밟아(약 0.4초 이상 유지) 속도가 설정속도보다 빨라지면, "
+    "설정속도를 현재 속도로 자동 동기화합니다. openpilot 롱컨(예: DEC 켜짐)에서만 작동하며, "
+    "순정 ACC에서는 무효입니다."
   ),
   "EnableStalkBigStep": tr_noop(
-    "VW MEB only: Use the cruise stalk's second detent (GRA_Tip_Stufe_2) for a big "
-    "set-speed step (rounded to 5). Requires openpilot longitudinal control "
-    "(e.g. DEC enabled); has no effect with stock ACC."
+    "VW MEB 전용: 크루즈 스토크 2단(GRA_Tip_Stufe_2)으로 설정속도를 크게(5단위) 조절합니다. "
+    "openpilot 롱컨(예: DEC 켜짐) 필요. ※현재는 opendbc 미반영으로 동작하지 않습니다(켜도 무해)."
   ),
   "EnableWebTerminal": tr_noop(
-    "WARNING: Starts the carrot recovery web terminal on port 6999 (runs both while "
-    "driving and parked). Open http://<device-ip>:6999 in a browser for a terminal "
-    "and git recovery UI. This exposes an UNAUTHENTICATED root shell to anyone on the "
-    "same network - only enable on trusted networks. Takes effect after a reboot."
+    "경고: 6999 포트에 carrot 복구 웹 터미널을 띄웁니다(주행/주차 모두 실행). 브라우저로 "
+    "http://<디바이스IP>:6999 접속 시 터미널 + git 복구 UI를 사용할 수 있습니다. 같은 "
+    "네트워크의 누구나 인증 없이 root 셸에 접근할 수 있으니 신뢰된 네트워크에서만 켜세요. 재부팅 후 적용."
   ),
   "Mads": tr_noop(
-    "Shortcut to MADS (Modular Assistive Driving System): keep steering (lateral) "
-    "engaged independently of cruise. Same setting as Steering > MADS."
+    "MADS(상시 조향) 바로가기: 크루즈와 무관하게 조향(횡방향)을 유지합니다. "
+    "Steering > MADS와 동일한 설정입니다."
   ),
   "DynamicExperimentalControl": tr_noop(
-    "Shortcut to Dynamic Experimental Control (DEC): automatically switch between "
-    "chill and experimental longitudinal as the scene requires. Same setting as Cruise > DEC."
+    "DEC(동적 실험 롱컨) 바로가기: 상황에 따라 일반/실험 롱컨을 자동으로 전환합니다. "
+    "Cruise > DEC와 동일한 설정. 가스싱크·빅스텝을 쓰려면 이 항목을 켜야 합니다."
   ),
   "EnableTmapSpeedLimit": tr_noop(
-    "Use the T map / KakaoNavi phone navigation as the speed-limit and speed-camera "
-    "source (carrot SDI broadcast over UDP :7706). Enabling this also turns on Speed "
-    "Limit Control and sets the speed-limit policy to map-data, and disables the OSM "
-    "map download. The phone app must broadcast to the device. Takes effect after a reboot."
+    "T맵/카카오내비 폰 내비를 제한속도·과속카메라 소스로 사용합니다(carrot SDI, UDP :7706). "
+    "켜면 속도제한 제어가 켜지고 정책이 map-data로 설정되며, OSM 지도 다운로드는 꺼집니다. "
+    "폰 앱이 디바이스로 데이터를 브로드캐스트해야 작동합니다. 재부팅 후 적용."
   ),
 }
 
@@ -92,37 +88,37 @@ class TjddydLayout(Widget):
     # param, title, desc, icon
     self._toggle_defs = {
       "DisableDM": (
-        lambda: tr("Disable Driver Monitoring (USE AT OWN RISK)"),
+        lambda: tr("운전자 감시 끄기 (본인 책임)"),
         DESCRIPTIONS["DisableDM"],
         "chffr_wheel.png",
       ),
       "AutoGasSyncSpeed": (
-        lambda: tr("VW MEB: Auto Gas Sync Set Speed"),
+        lambda: tr("VW MEB: 가스 싱크 (설정속도 자동맞춤)"),
         DESCRIPTIONS["AutoGasSyncSpeed"],
         "speed_limit.png",
       ),
       "EnableStalkBigStep": (
-        lambda: tr("VW MEB: Stalk Big Step (2nd detent)"),
+        lambda: tr("VW MEB: 스토크 빅스텝 (2단)"),
         DESCRIPTIONS["EnableStalkBigStep"],
         "speed_limit.png",
       ),
       "EnableWebTerminal": (
-        lambda: tr("Web Terminal on :6999 (USE AT OWN RISK)"),
+        lambda: tr("웹 터미널 :6999 (본인 책임)"),
         DESCRIPTIONS["EnableWebTerminal"],
         "chffr_wheel.png",
       ),
       "Mads": (
-        lambda: tr("MADS - Always-on Steering (shortcut)"),
+        lambda: tr("MADS - 상시 조향 (바로가기)"),
         DESCRIPTIONS["Mads"],
         "chffr_wheel.png",
       ),
       "DynamicExperimentalControl": (
-        lambda: tr("Dynamic Experimental Control (shortcut)"),
+        lambda: tr("DEC - 동적 실험 롱컨 (바로가기)"),
         DESCRIPTIONS["DynamicExperimentalControl"],
         "speed_limit.png",
       ),
       "EnableTmapSpeedLimit": (
-        lambda: tr("TMAP/KakaoNavi Speed Limit (:7706)"),
+        lambda: tr("T맵/카카오내비 제한속도 (:7706)"),
         DESCRIPTIONS["EnableTmapSpeedLimit"],
         "speed_limit.png",
       ),
