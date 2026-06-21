@@ -117,7 +117,13 @@ def main_thread():
   config_realtime_process([0, 1, 2, 3], 5)
 
   rk = Ratekeeper(1, print_delay_threshold=None)
-  live_map_sp = OsmMapData()
+  # tjddyd Phase 2 opt-in: use the TMAP/KakaoNavi UDP speed-limit source instead of OSM
+  use_tmap = params.get_bool("EnableTmapSpeedLimit")
+  if use_tmap:
+    from openpilot.sunnypilot.mapd.live_map_data.tmap_map_data import TmapMapData
+    live_map_sp = TmapMapData()
+  else:
+    live_map_sp = OsmMapData()
 
   # Create folder needed for OSM
   try:
@@ -128,10 +134,10 @@ def main_thread():
     cloudlog.exception(f"mapd: failed to make {Paths.mapd_root()}")
 
   while True:
-    show_alert = get_files_for_cleanup() and params.get_bool("OsmLocal")
-    set_offroad_alert("Offroad_OSMUpdateRequired", show_alert, "This alert will be cleared when new maps are downloaded.")
-
-    update_osm_db()
+    if not use_tmap:
+      show_alert = get_files_for_cleanup() and params.get_bool("OsmLocal")
+      set_offroad_alert("Offroad_OSMUpdateRequired", show_alert, "This alert will be cleared when new maps are downloaded.")
+      update_osm_db()
     live_map_sp.tick()
     rk.keep_time()
 
