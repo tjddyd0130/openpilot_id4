@@ -184,6 +184,6 @@ class TjddydLayout(Widget):
     if param == "EnableTmapSpeedLimit" and state:
       try:
         self._params.put_bool("EnableSpeedLimitControl", True)
-        self._params.put("SpeedLimitPolicy", "1")  # Policy.map_data_only
+        self._params.put("SpeedLimitPolicy", 1)  # Policy.map_data_only
       except UnknownKeyName:
         pass

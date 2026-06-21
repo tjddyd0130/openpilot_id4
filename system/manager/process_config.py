@@ -20,7 +20,7 @@ def driverview(started: bool, params: Params, CP: car.CarParams) -> bool:
 
 def enable_dm(started: bool, params: Params, CP: car.CarParams) -> bool:
   # tjddyd opt-in (carrot DisableDM): skip the driver monitoring model/daemon when off
-  return driverview(started, params, CP) and params.get_int("DisableDM") == 0
+  return driverview(started, params, CP) and params.get("DisableDM", return_default=True) == 0
 
 def notcar(started: bool, params: Params, CP: car.CarParams) -> bool:
   return started and CP.notCar

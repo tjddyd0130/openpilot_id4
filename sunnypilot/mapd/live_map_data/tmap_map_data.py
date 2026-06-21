@@ -50,9 +50,9 @@ class TmapMapData(BaseMapData):
     threading.Thread(target=self._udp_thread, daemon=True).start()
 
   def _read_params(self) -> None:
-    self.autoNaviSpeedSafetyFactor = float(self.params.get_int("AutoNaviSpeedSafetyFactor")) * 0.01
-    self.autoNaviSpeedCtrlMode = self.params.get_int("AutoNaviSpeedCtrlMode")
-    self.autoNaviSpeedBumpSpeed = float(self.params.get_int("AutoNaviSpeedBumpSpeed"))
+    self.autoNaviSpeedSafetyFactor = float(self.params.get("AutoNaviSpeedSafetyFactor", return_default=True)) * 0.01
+    self.autoNaviSpeedCtrlMode = self.params.get("AutoNaviSpeedCtrlMode", return_default=True)
+    self.autoNaviSpeedBumpSpeed = float(self.params.get("AutoNaviSpeedBumpSpeed", return_default=True))
 
   def _udp_thread(self) -> None:
     while True:

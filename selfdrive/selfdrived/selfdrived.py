@@ -95,7 +95,7 @@ class SelfdriveD(CruiseHelper):
     # tjddyd opt-in (carrot DisableDM): when DM is disabled, the dmonitoringd/modeld
     # processes are not started, so driverMonitoringState is never published. Ignore it
     # in the alive/valid/freq checks so it doesn't block engagement. Reboot required.
-    self.disable_dm = self.params.get_int("DisableDM")
+    self.disable_dm = self.params.get("DisableDM", return_default=True)
 
     ignore = self.sensor_packets + self.gps_packets + ['alertDebug', 'lateralManeuverPlan'] + ['modelDataV2SP']
     if not Params().get_bool("EnableCurvatureD"):

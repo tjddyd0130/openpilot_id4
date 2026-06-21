@@ -70,7 +70,7 @@ class Controls(ControlsExt):
     self.smooth_steer = PT2Filter(46.0, 1.0, DT_CTRL)
     self.force_rhd_for_bsm = self.params.get_bool("ForceRHDForBSM")
     self.disable_car_steer_alerts = self.params.get_bool("DisableCarSteerAlerts")
-    self.disable_dm = self.params.get_int("DisableDM")  # tjddyd opt-in (carrot DisableDM)
+    self.disable_dm = self.params.get("DisableDM", return_default=True)  # tjddyd opt-in (carrot DisableDM)
 
     self.pose_calibrator = PoseCalibrator()
     self.calibrated_pose: Pose | None = None
@@ -112,7 +112,7 @@ class Controls(ControlsExt):
       self.force_rhd_for_bsm = self.params.get_bool("ForceRHDForBSM")
       self.enable_long_comfort_mode = self.params.get_bool("EnableLongComfortMode")
       self.disable_car_steer_alerts = self.params.get_bool("DisableCarSteerAlerts")
-      self.disable_dm = self.params.get_int("DisableDM")
+      self.disable_dm = self.params.get("DisableDM", return_default=True)
   
   def state_control(self):
     CS = self.sm['carState']
