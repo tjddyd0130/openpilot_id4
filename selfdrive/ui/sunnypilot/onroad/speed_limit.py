@@ -190,7 +190,12 @@ class SpeedLimitRenderer(Widget, SpeedLimitAlertRenderer):
 
     alpha = self._pre_active_fade.alpha
 
-    if ui_state.speed_limit_mode != SpeedLimitMode.off:
+    # tjddyd: only show the sign when there is an actual speed limit (data coming in).
+    # With TMAP as the source this means the sign appears when the phone nav is
+    # connected and hides when it disconnects, instead of showing an empty "---".
+    has_limit = self.speed_limit_valid or self.speed_limit_last_valid
+
+    if ui_state.speed_limit_mode != SpeedLimitMode.off and has_limit:
       self._draw_sign_main(sign_rect, alpha)
       if self.speed_limit_assist_state == AssistState.preActive:
         self._draw_pre_active_arrow(sign_rect)
