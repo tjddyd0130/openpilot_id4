@@ -1,0 +1,46 @@
+From b13d3c1121c5d0dff407ab5a65c46ecc64fc68fe Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 21 Jun 2026 14:45:44 +0000
+Subject: [PATCH] VW MEB: decode cruise stalk 2nd detent (GRA_Tip_Stufe_2) into
+ CarStateSP
+
+Adds CarStateSP.graTipStufe2 and decodes GRA_ACC_01.GRA_Tip_Stufe_2 (the cruise
+stalk big-step / 2nd detent, value 1 = Tip_Stufe_2) in the MEB carstate. This is
+the opendbc half of the tjddyd opt-in "stalk big step": the openpilot side
+(cruise.py) already forces a long-press-equivalent big step when this is set on
+MEB with openpilot longitudinal control.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_015XiGYrFo4VxceB8UKz4mPV
+---
+ opendbc/car/structs.py             | 1 +
+ opendbc/car/volkswagen/carstate.py | 4 +++-
+ 2 files changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/opendbc/car/structs.py b/opendbc/car/structs.py
+index 7fd76233..b8125b0f 100644
+--- a/opendbc/car/structs.py
++++ b/opendbc/car/structs.py
+@@ -170,3 +170,4 @@ class CarControlSP:
+ @auto_dataclass
+ class CarStateSP:
+   speedLimit: float = auto_field()
++  graTipStufe2: bool = auto_field()  # VW MEB: cruise stalk 2nd detent (big step), tjddyd opt-in
+diff --git a/opendbc/car/volkswagen/carstate.py b/opendbc/car/volkswagen/carstate.py
+index 4e64aeec..9d228f1b 100644
+--- a/opendbc/car/volkswagen/carstate.py
++++ b/opendbc/car/volkswagen/carstate.py
+@@ -407,7 +407,9 @@ class CarState(CarStateBase, MadsCarState):
+         ret.cruiseState.speedLimit = self._tmap_cluster_speed_limit
+ 
+     ret_sp.speedLimit = ret.cruiseState.speedLimit
+-    
++    # tjddyd VW MEB opt-in: cruise stalk 2nd detent (big step). 1 = Tip_Stufe_2.
++    ret_sp.graTipStufe2 = bool(pt_cp.vl["GRA_ACC_01"]["GRA_Tip_Stufe_2"])
++
+     # Update button states for turn signals and ACC controls, capture all ACC button state/config for passthrough
+     # turn signal effect
+     self.left_blinker_active  = bool(pt_cp.vl["Blinkmodi_02"]["BM_links"])
+-- 
+2.43.0
+
