@@ -1,0 +1,38 @@
+From cdd04ece1f805c06fb0c4699f7f5e628612cdd6c Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 21 Jun 2026 14:39:41 +0000
+Subject: [PATCH] VW MEB: keep TMAP camera limit shown on the cluster until
+ passed
+
+The cluster speed-limit used a 4s change-triggered flash (sl_active timer), so a
+TMAP camera limit would only blink briefly when first detected and vanish well
+before the camera. Show it for as long as cruiseState.speedLimit is non-zero --
+with the camera-centric TMAP source that means the dash sign lights up while a
+speed camera is ahead and clears once it is passed. MEB/MQB_EVO HUD block only.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_015XiGYrFo4VxceB8UKz4mPV
+---
+ opendbc/car/volkswagen/carcontroller.py | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/opendbc/car/volkswagen/carcontroller.py b/opendbc/car/volkswagen/carcontroller.py
+index 7354cdf5..1f8729de 100644
+--- a/opendbc/car/volkswagen/carcontroller.py
++++ b/opendbc/car/volkswagen/carcontroller.py
+@@ -286,7 +286,11 @@ class CarController(CarControllerBase, IntelligentCruiseButtonManagementInterfac
+         if CC.cruiseControl.speedLimit and CS.out.cruiseState.speedLimit != 0 and self.speed_limit_last != CS.out.cruiseState.speedLimit:
+           self.speed_limit_changed_timer = self.frame 
+         self.speed_limit_last = CS.out.cruiseState.speedLimit
+-        sl_active = self.frame - self.speed_limit_changed_timer < 400
++        # tjddyd: keep the cluster speed-limit lit for as long as a limit is present, instead
++        # of the brief change-triggered 4s flash. With the TMAP camera-centric source,
++        # cruiseState.speedLimit is non-zero only while a speed camera is ahead and clears to 0
++        # after passing, so the dash sign turns on at the camera and off once it is behind.
++        sl_active = CS.out.cruiseState.speedLimit != 0
+         speed_limit = CS.out.cruiseState.speedLimitPredicative if sl_predicative_active else (CS.out.cruiseState.speedLimit if sl_active else 0)
+           
+         acc_hud_event = self.CCS.acc_hud_event(acc_hud_status, CS.esp_hold_confirmation, sl_predicative_active, CS.speed_limit_predicative_type, sl_active)
+-- 
+2.43.0
+

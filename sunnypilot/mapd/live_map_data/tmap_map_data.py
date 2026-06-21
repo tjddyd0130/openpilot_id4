@@ -307,12 +307,14 @@ class TmapMapData(BaseMapData):
       if self._fresh():
         limit = f"{int(self.nRoadLimitSpeed)}km/h" if self.nRoadLimitSpeed >= MIN_VALID_SPEED_LIMIT else "없음"
         status = f"연결됨 · 제한 {limit} · {self._remote_ip}"
-        road_limit = int(self.nRoadLimitSpeed) if self.nRoadLimitSpeed >= MIN_VALID_SPEED_LIMIT else 0
+        # cluster shows the upcoming CAMERA limit only (camera-centric): xSpdLimit is non-zero
+        # while a speed camera is ahead and clears to 0 after passing. Exclude speed bumps
+        # (xSpdType 22) so only camera warnings light up the dash.
+        cluster_limit = int(round(self.xSpdLimit)) if (self.xSpdLimit > 0 and self.xSpdType != 22) else 0
       else:
         status = "수신 없음 · 폰 앱/네트워크 확인"
-        road_limit = 0
+        cluster_limit = 0
     self.params.put("TmapStatus", status)
-    # Road speed limit (kph) for the car process to show on the MEB cluster (ACC_Tempolimit).
-    # This is the continuous posted limit -- separate from the camera-centric onroad UI, which
-    # stays hidden -- so the dash behaves like a factory nav while the screen shows only cameras.
-    self.params.put("TmapRoadLimit", road_limit)
+    # Camera speed limit (kph) for the MEB cluster (ACC_Tempolimit): appears at a speed
+    # camera and disappears after passing -- mirrors the camera-centric onroad UI.
+    self.params.put("TmapRoadLimit", cluster_limit)
