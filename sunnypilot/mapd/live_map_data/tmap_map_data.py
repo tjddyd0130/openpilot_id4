@@ -12,8 +12,10 @@ Only the speed-limit / camera subset of carrot's carrot_serv.py is ported here.
 Turn-by-turn, ATC turns, curve speed, GPS path matching, FTP and the web server
 are intentionally excluded.
 """
+import fcntl
 import json
 import socket
+import struct
 import threading
 import time
 
@@ -21,8 +23,12 @@ import cereal.messaging as messaging
 from openpilot.common.constants import CV
 from openpilot.sunnypilot.mapd.live_map_data.base_map_data import BaseMapData, MAX_SPEED_LIMIT
 
-TMAP_UDP_PORT = 7706   # carrot carrot_man_port: bind here to receive the SDI broadcast
-DATA_TIMEOUT = 3.0     # seconds; navigation data is considered stale after this
+TMAP_UDP_PORT = 7706        # carrot carrot_man_port: bind here to receive the SDI broadcast
+TMAP_BROADCAST_PORT = 7705  # carrot broadcast_port: announce the device here for discovery
+DATA_TIMEOUT = 3.0          # seconds; navigation data is considered stale after this
+
+SIOCGIFADDR = 0x8915        # get interface IP
+SIOCGIFBRDADDR = 0x8919     # get interface broadcast address
 
 # carrot nSdiType values that carry a speed limit / fixed camera
 SDI_LIMIT_TYPES = (0, 1, 2, 3, 4, 7, 8, 75, 76)
@@ -49,6 +55,42 @@ class TmapMapData(BaseMapData):
     self.autoNaviSpeedBumpSpeed = 35.0
 
     threading.Thread(target=self._udp_thread, daemon=True).start()
+    threading.Thread(target=self._broadcast_thread, daemon=True).start()
+
+  @staticmethod
+  def _iface_addr(ioctl_code: int, ifname: str = "wlan0") -> str | None:
+    try:
+      with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        return socket.inet_ntoa(fcntl.ioctl(s.fileno(), ioctl_code,
+                                            struct.pack('256s', ifname.encode()[:15]))[20:24])
+    except Exception:
+      return None
+
+  def _broadcast_thread(self) -> None:
+    # carrot device discovery: broadcast a "Carrot2" announcement on :7705 so the phone
+    # nav app finds this device and starts sending SDI data to :7706.
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+    while True:
+      try:
+        ip = self._iface_addr(SIOCGIFADDR) or ""
+        bcast = self._iface_addr(SIOCGIFBRDADDR) or "255.255.255.255"
+        msg = json.dumps({
+          "Carrot2": self.params.get("Version") or "",
+          "IsOnroad": self.params.get_bool("IsOnroad"),
+          "CarrotRouteActive": False,
+          "ip": ip,
+          "port": TMAP_UDP_PORT,
+          "navi_debug": 0,
+        }).encode("utf-8")
+        for target in {bcast, "255.255.255.255"}:
+          try:
+            sock.sendto(msg, (target, TMAP_BROADCAST_PORT))
+          except Exception:
+            pass
+      except Exception:
+        pass
+      time.sleep(1)
 
   def _read_params(self) -> None:
     self.autoNaviSpeedSafetyFactor = float(self.params.get("AutoNaviSpeedSafetyFactor", return_default=True)) * 0.01
