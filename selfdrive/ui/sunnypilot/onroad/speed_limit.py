@@ -190,12 +190,15 @@ class SpeedLimitRenderer(Widget, SpeedLimitAlertRenderer):
 
     alpha = self._pre_active_fade.alpha
 
-    # tjddyd: only show the sign when there is an actual speed limit (data coming in).
-    # With TMAP as the source this means the sign appears when the phone nav is
-    # connected and hides when it disconnects, instead of showing an empty "---".
+    # tjddyd camera-centric: the TMAP source intentionally reports no current road
+    # limit (get_current_speed_limit()==0), so speed_limit_valid is False on open road
+    # and the sign stays hidden. When a speed camera is ahead the limit lives only in
+    # speed_limit_ahead (liveMapDataSP), so also show the main sign for the upcoming
+    # camera -- the red sign then appears as you approach a camera zone (~200m out).
     has_limit = self.speed_limit_valid or self.speed_limit_last_valid
+    has_ahead = self.speed_limit_ahead_valid and self.speed_limit_ahead > 0
 
-    if ui_state.speed_limit_mode != SpeedLimitMode.off and has_limit:
+    if ui_state.speed_limit_mode != SpeedLimitMode.off and (has_limit or has_ahead):
       self._draw_sign_main(sign_rect, alpha)
       if self.speed_limit_assist_state == AssistState.preActive:
         self._draw_pre_active_arrow(sign_rect)
@@ -205,9 +208,21 @@ class SpeedLimitRenderer(Widget, SpeedLimitAlertRenderer):
   def _draw_sign_main(self, rect, alpha=1.0):
     speed_limit_warning_enabled = ui_state.speed_limit_mode >= SpeedLimitMode.warning
     has_limit = self.speed_limit_valid or self.speed_limit_last_valid
-    is_overspeed = has_limit and round(self.speed_limit_final_last) < round(self.speed)
+    has_ahead = self.speed_limit_ahead_valid and self.speed_limit_ahead > 0
 
-    limit_str = str(round(self.speed_limit_last)) if has_limit else "---"
+    # camera-centric: when there is no active road limit but a camera is ahead, show
+    # the upcoming camera's limit on the sign (grey, since it isn't enforced yet).
+    if has_limit:
+      display_limit = self.speed_limit_last
+    elif has_ahead:
+      display_limit = self.speed_limit_ahead
+    else:
+      display_limit = 0.0
+    has_value = has_limit or has_ahead
+
+    is_overspeed = has_value and round(display_limit) < round(self.speed)
+
+    limit_str = str(round(display_limit)) if has_value else "---"
     sub_text = ""
     if self.speed_limit_offset != 0:
       sign = "" if self.speed_limit_offset > 0 else "-"
@@ -220,9 +235,9 @@ class SpeedLimitRenderer(Widget, SpeedLimitAlertRenderer):
       txt_color = Colors.GREY
 
     if ui_state.is_metric:
-      self._render_vienna(rect, limit_str, sub_text, txt_color, has_limit, alpha)
+      self._render_vienna(rect, limit_str, sub_text, txt_color, has_value, alpha)
     else:
-      self._render_mutcd(rect, limit_str, sub_text, txt_color, has_limit, alpha)
+      self._render_mutcd(rect, limit_str, sub_text, txt_color, has_value, alpha)
 
   def _draw_pre_active_arrow(self, sign_rect):
     _, txt_icon, icon_alpha, _, _ = SpeedLimitAlertRenderer.speed_limit_pre_active_icon_helper(self)
