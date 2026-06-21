@@ -21,16 +21,25 @@ if gui_app.sunnypilot_ui():
 
 from openpilot.system.ui.sunnypilot.widgets.list_view import option_item_sp
 
-# TMAP (carrot AutoNavi) numeric options: (param, title, min, max, step)
+# TMAP (carrot AutoNavi) numeric options: (param, title, description, min, max, step)
+# Titles/descriptions and ranges ported from carrot (selfdrive/carrot_settings.json).
 TMAP_OPTIONS = [
-  ("AutoNaviSpeedCtrlMode", "TMAP: Speed Control Mode (0=off,1=cam,2=+bump,3=+mobile)", 0, 3, 1),
-  ("AutoNaviSpeedSafetyFactor", "TMAP: Speed Limit Safety Factor (%)", 80, 130, 5),
-  ("AutoNaviSpeedDecelRate", "TMAP: Decel Rate (x0.01 m/s^2)", 50, 200, 10),
-  ("AutoNaviSpeedCtrlEnd", "TMAP: Control End Time (s)", 0, 30, 1),
-  ("AutoNaviSpeedBumpSpeed", "TMAP: Speed Bump Speed (km/h)", 10, 60, 5),
-  ("AutoNaviSpeedBumpTime", "TMAP: Speed Bump Time (s)", 0, 5, 1),
-  ("AutoNaviCountDownMode", "TMAP: Countdown Mode", 0, 2, 1),
-  ("AutoRoadSpeedLimitOffset", "TMAP: Road Speed Limit Offset (km/h)", -10, 10, 1),
+  ("AutoNaviSpeedCtrlMode", "네비게이션 감속모드",
+   "0: 감속안함  1: 과속카메라  2: +과속방지턱  3: +이동식카메라", 0, 3, 1),
+  ("AutoNaviSpeedSafetyFactor", "과속카메라 제한속도 적용율(%)",
+   "과속카메라에서 도로제한속도 × 설정값(%)으로 감속합니다", 80, 120, 1),
+  ("AutoNaviSpeedDecelRate", "과속카메라 감속율(×0.01 m/s²)",
+   "낮을수록 더 멀리서부터 천천히 감속합니다", 50, 300, 10),
+  ("AutoNaviSpeedCtrlEnd", "과속카메라 감속 완료시간(초)",
+   "감속 종료 시점을 설정합니다", 3, 20, 1),
+  ("AutoNaviSpeedBumpSpeed", "과속방지턱 통과속도(km/h)",
+   "과속방지턱을 통과할 목표 속도", 10, 100, 5),
+  ("AutoNaviSpeedBumpTime", "사고방지턱 감속완료 시점(초)",
+   "사고방지턱 감속을 끝낼 시점", 1, 50, 1),
+  ("AutoNaviCountDownMode", "네비 알림 카운트다운",
+   "0: 알림없음  1: 턴지점+속도  2: 턴지점+속도+방지턱", 0, 2, 1),
+  ("AutoRoadSpeedLimitOffset", "도로제한속도 맞춤(offset)",
+   "도로제한속도 + 설정값. -1이면 미적용", -1, 100, 1),
 ]
 
 # Description constants
@@ -133,15 +142,19 @@ class TjddydLayout(Widget):
 
     # TMAP/KakaoNavi numeric options (carrot AutoNavi params), only active when TMAP is on
     items = list(self._toggles.values())
-    for opt_param, opt_title, opt_min, opt_max, opt_step in TMAP_OPTIONS:
-      items.append(option_item_sp(
+    self._option_items = []
+    for opt_param, opt_title, opt_descr, opt_min, opt_max, opt_step in TMAP_OPTIONS:
+      opt = option_item_sp(
         title=(lambda t=opt_title: tr(t)),
         param=opt_param,
         min_value=opt_min,
         max_value=opt_max,
+        description=(lambda d=opt_descr: tr(d)),
         value_change_step=opt_step,
         enabled=lambda: ui_state.params.get_bool("EnableTmapSpeedLimit"),
-      ))
+      )
+      self._option_items.append(opt)
+      items.append(opt)
 
     self._scroller = Scroller(items, line_separator=True, spacing=0)
 
@@ -151,6 +164,8 @@ class TjddydLayout(Widget):
   def show_event(self):
     super().show_event()
     self._scroller.show_event()
+    for opt in getattr(self, "_option_items", []):
+      opt.show_description(True)
     self._update_toggles()
 
   def _update_toggles(self):
