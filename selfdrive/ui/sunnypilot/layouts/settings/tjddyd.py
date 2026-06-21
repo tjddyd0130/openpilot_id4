@@ -10,7 +10,7 @@ and cannot be gated per car, so its description carries a safety warning.
 """
 from openpilot.common.params import Params, UnknownKeyName
 from openpilot.system.ui.widgets import Widget
-from openpilot.system.ui.widgets.list_view import toggle_item
+from openpilot.system.ui.widgets.list_view import toggle_item, text_item
 from openpilot.system.ui.widgets.scroller_tici import Scroller
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.multilang import tr, tr_noop
@@ -136,8 +136,17 @@ class TjddydLayout(Widget):
       toggle.set_description(lambda og_desc=toggle.description: tr(og_desc))
       self._toggles[param] = toggle
 
+    # Live TMAP connection status row (updated ~2x/sec from the TmapStatus param)
+    self._tmap_status_text = tr("꺼짐 (토글 OFF)")
+    self._status_counter = 0
+    self._tmap_status_item = text_item(
+      lambda: tr("티맵 연결 상태"),
+      lambda: self._tmap_status_text,
+    )
+
     # TMAP/KakaoNavi numeric options (carrot AutoNavi params), only active when TMAP is on
     items = list(self._toggles.values())
+    items.append(self._tmap_status_item)
     self._option_items = []
     for opt_param, opt_title, opt_descr, opt_min, opt_max, opt_step in TMAP_OPTIONS:
       opt = option_item_sp(
@@ -155,7 +164,14 @@ class TjddydLayout(Widget):
     self._scroller = Scroller(items, line_separator=True, spacing=0)
 
   def _update_state(self):
-    return
+    # Throttle the TMAP status param read to ~2x/sec (avoid per-frame IPC)
+    self._status_counter += 1
+    if self._status_counter % 30 == 0:
+      if not self._params.get_bool("EnableTmapSpeedLimit"):
+        self._tmap_status_text = tr("꺼짐 (토글 OFF)")
+      else:
+        s = self._params.get("TmapStatus")
+        self._tmap_status_text = s if s else tr("대기 중 · 폰 데이터 없음")
 
   def show_event(self):
     super().show_event()

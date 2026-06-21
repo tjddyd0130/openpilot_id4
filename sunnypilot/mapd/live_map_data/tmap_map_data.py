@@ -41,6 +41,7 @@ class TmapMapData(BaseMapData):
     self.xSpdType = -1
     self.roadName = ""
     self._nRoadLimitSpeed_counter = 0
+    self._remote_ip = ""
 
     # AutoNavi params (carrot semantics, read live)
     self.autoNaviSpeedSafetyFactor = 1.05
@@ -62,13 +63,14 @@ class TmapMapData(BaseMapData):
           sock.bind(('0.0.0.0', TMAP_UDP_PORT))
           while True:
             try:
-              data, _ = sock.recvfrom(4096)
+              data, addr = sock.recvfrom(4096)
             except socket.timeout:
               continue
             if not data:
               continue
             try:
               self._handle(json.loads(data.decode()))
+              self._remote_ip = addr[0]
             except Exception:
               continue
       except Exception:
@@ -175,3 +177,11 @@ class TmapMapData(BaseMapData):
     live_map_data.speedLimitAheadDistance = next_speed_limit_distance
     live_map_data.roadName = self.get_current_road_name()
     self.pm.send('liveMapDataSP', mapd_sp_send)
+
+    # publish a human-readable status for the UI (tjddyd tab)
+    with self._lock:
+      if self._fresh():
+        status = f"연결됨 · 제한 {int(self.nRoadLimitSpeed)}km/h · {self._remote_ip}"
+      else:
+        status = "수신 없음 · 폰 앱/네트워크 확인"
+    self.params.put("TmapStatus", status)
