@@ -1,12 +1,13 @@
 """
 TMAP / KakaoNavi speed-limit + speed-camera adapter (tjddyd Phase 2).
 
-A phone navigation app (T map / KakaoNavi with the carrot/SDI broadcast plugin)
-broadcasts route-guidance JSON over UDP to port 7706. This adapter binds that
-port, extracts only the speed-limit and speed-camera fields (nRoadLimitSpeed and
-the nSdi* SDI block), and republishes them as the standard sunnypilot
-``liveMapDataSP`` message so the existing speed-limit resolver and the instrument
-cluster (ACC_Tempolimit) consume it with no further changes.
+A phone navigation app (modified T map / KakaoNavi) discovers this device via a
+UDP "Carrot2" broadcast on :7705 and then delivers route-guidance JSON. Modern
+apps POST it as {"rgdata": {...}} over HTTP to :7713; older ones send UDP to
+:7706. Both paths feed the same parser, which extracts the speed-limit and
+speed-camera fields (nRoadLimitSpeed and the nSdi* SDI block) and republishes
+them as the standard sunnypilot ``liveMapDataSP`` message so the existing
+speed-limit resolver consumes it with no further changes.
 
 Only the speed-limit / camera subset of carrot's carrot_serv.py is ported here.
 Turn-by-turn, ATC turns, curve speed, GPS path matching, FTP and the web server
@@ -18,13 +19,15 @@ import socket
 import struct
 import threading
 import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import cereal.messaging as messaging
 from openpilot.common.constants import CV
 from openpilot.sunnypilot.mapd.live_map_data.base_map_data import BaseMapData, MAX_SPEED_LIMIT
 
-TMAP_UDP_PORT = 7706        # carrot carrot_man_port: bind here to receive the SDI broadcast
+TMAP_UDP_PORT = 7706        # carrot carrot_man_port: legacy UDP SDI receiver
 TMAP_BROADCAST_PORT = 7705  # carrot broadcast_port: announce the device here for discovery
+TMAP_HTTP_PORT = 7713       # carrot navi_http_port: modern phone app POSTs rgdata here
 DATA_TIMEOUT = 3.0          # seconds; navigation data is considered stale after this
 
 SIOCGIFADDR = 0x8915        # get interface IP
@@ -32,6 +35,50 @@ SIOCGIFBRDADDR = 0x8919     # get interface broadcast address
 
 # carrot nSdiType values that carry a speed limit / fixed camera
 SDI_LIMIT_TYPES = (0, 1, 2, 3, 4, 7, 8, 75, 76)
+
+
+class _NaviHandler(BaseHTTPRequestHandler):
+  # The modern T map / KakaoNavi phone app POSTs route guidance to /api/navi/<version>
+  # as {"rgdata": {...}}; rgdata carries the same fields the UDP path used.
+  def do_POST(self):
+    rgdata = None
+    try:
+      length = int(self.headers.get('Content-Length', 0))
+      body = self.rfile.read(length) if length > 0 else b''
+      obj = json.loads(body.decode('utf-8'))
+      if isinstance(obj, dict) and isinstance(obj.get('rgdata'), dict):
+        rgdata = obj['rgdata']
+    except Exception:
+      rgdata = None
+
+    if rgdata is not None:
+      try:
+        self.server.tmap._handle(rgdata)
+        self.server.tmap._remote_ip = self.client_address[0]
+      except Exception:
+        pass
+
+    resp = json.dumps({"ok": rgdata is not None}).encode('utf-8')
+    try:
+      self.send_response(200)
+      self.send_header('Content-Type', 'application/json')
+      self.send_header('Content-Length', str(len(resp)))
+      self.end_headers()
+      self.wfile.write(resp)
+    except Exception:
+      pass
+
+  def do_GET(self):
+    try:
+      self.send_response(200)
+      self.send_header('Content-Length', '2')
+      self.end_headers()
+      self.wfile.write(b'ok')
+    except Exception:
+      pass
+
+  def log_message(self, *args):
+    pass  # silence access logging
 
 
 class TmapMapData(BaseMapData):
@@ -56,6 +103,17 @@ class TmapMapData(BaseMapData):
 
     threading.Thread(target=self._udp_thread, daemon=True).start()
     threading.Thread(target=self._broadcast_thread, daemon=True).start()
+    threading.Thread(target=self._http_thread, daemon=True).start()
+
+  def _http_thread(self) -> None:
+    # Modern phone app delivers rgdata via HTTP POST on :7713 (carrot navi_http_port).
+    while True:
+      try:
+        httpd = ThreadingHTTPServer(('0.0.0.0', TMAP_HTTP_PORT), _NaviHandler)
+        httpd.tmap = self
+        httpd.serve_forever()
+      except Exception:
+        time.sleep(1)
 
   @staticmethod
   def _iface_addr(ioctl_code: int, ifname: str = "wlan0") -> str | None:
@@ -82,6 +140,16 @@ class TmapMapData(BaseMapData):
           "ip": ip,
           "port": TMAP_UDP_PORT,
           "navi_debug": 0,
+          "navi_http_port": TMAP_HTTP_PORT,
+          "log_carrot": "",
+          "v_cruise_kph": 0,
+          "carcruiseSpeed": 0,
+          "v_ego_kph": 0,
+          "tbt_dist": 0,
+          "sdi_dist": 0,
+          "active": False,
+          "xState": 0,
+          "trafficState": 0,
         }).encode("utf-8")
         for target in {bcast, "255.255.255.255"}:
           try:
