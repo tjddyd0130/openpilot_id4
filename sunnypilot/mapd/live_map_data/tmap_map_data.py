@@ -15,6 +15,7 @@ are intentionally excluded.
 """
 import fcntl
 import json
+import os
 import socket
 import struct
 import threading
@@ -29,6 +30,8 @@ TMAP_UDP_PORT = 7706        # carrot carrot_man_port: legacy UDP SDI receiver
 TMAP_BROADCAST_PORT = 7705  # carrot broadcast_port: announce the device here for discovery
 TMAP_HTTP_PORT = 7713       # carrot navi_http_port: modern phone app POSTs rgdata here
 DATA_TIMEOUT = 3.0          # seconds; navigation data is considered stale after this
+MIN_VALID_SPEED_LIMIT = 20  # kph; below this the nav reports a sentinel (e.g. 10 = unknown)
+DEBUG_DUMP = "/tmp/tmap_rgdata.json"  # last received rgdata, for inspection
 
 SIOCGIFADDR = 0x8915        # get interface IP
 SIOCGIFBRDADDR = 0x8919     # get interface broadcast address
@@ -95,6 +98,7 @@ class TmapMapData(BaseMapData):
     self.roadName = ""
     self._nRoadLimitSpeed_counter = 0
     self._remote_ip = ""
+    self._last_dump = 0.0
 
     # AutoNavi params (carrot semantics, read live)
     self.autoNaviSpeedSafetyFactor = 1.05
@@ -191,18 +195,27 @@ class TmapMapData(BaseMapData):
       return
     self._read_params()
 
+    # debug: keep the last rgdata on disk (tmpfs) at ~1Hz for inspection
+    now_dump = time.monotonic()
+    if now_dump - self._last_dump > 1.0:
+      self._last_dump = now_dump
+      try:
+        with open(DEBUG_DUMP, "w") as f:
+          json.dump(j, f, ensure_ascii=False)
+      except Exception:
+        pass
+
     def _i(v, d=0):
       return d if v is None else int(v)
 
     # road limit speed (carrot decode)
-    nrl = int(j.get("nRoadLimitSpeed", 20))
-    if nrl > 0:
-      if nrl > 200:
-        nrl = (nrl - 20) / 10
-      elif nrl == 120:
-        nrl = 115  # carrot: 120 -> 115 bugfix
-    else:
-      nrl = 30
+    nrl = _i(j.get("nRoadLimitSpeed"), 0)
+    if nrl > 200:
+      nrl = int((nrl - 20) / 10)
+    elif nrl == 120:
+      nrl = 115  # carrot: 120 -> 115 bugfix
+    if nrl < MIN_VALID_SPEED_LIMIT:
+      nrl = 0  # sentinel / no posted limit -> treat as none
 
     nSdiType = _i(j.get("nSdiType"), -1)
     nSdiSpeedLimit = _i(j.get("nSdiSpeedLimit"), 0)
@@ -258,7 +271,7 @@ class TmapMapData(BaseMapData):
 
   def get_current_speed_limit(self) -> float:
     with self._lock:
-      if not self._fresh():
+      if not self._fresh() or self.nRoadLimitSpeed < MIN_VALID_SPEED_LIMIT:
         return 0.0
       return float(self.nRoadLimitSpeed) * CV.KPH_TO_MS
 
@@ -291,7 +304,8 @@ class TmapMapData(BaseMapData):
     # publish a human-readable status for the UI (tjddyd tab)
     with self._lock:
       if self._fresh():
-        status = f"연결됨 · 제한 {int(self.nRoadLimitSpeed)}km/h · {self._remote_ip}"
+        limit = f"{int(self.nRoadLimitSpeed)}km/h" if self.nRoadLimitSpeed >= MIN_VALID_SPEED_LIMIT else "없음"
+        status = f"연결됨 · 제한 {limit} · {self._remote_ip}"
       else:
         status = "수신 없음 · 폰 앱/네트워크 확인"
     self.params.put("TmapStatus", status)
