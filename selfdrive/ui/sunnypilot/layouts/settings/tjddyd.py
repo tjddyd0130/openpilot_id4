@@ -196,14 +196,16 @@ class TjddydLayout(Widget):
       pass
 
     # Enabling the TMAP source wires up the whole speed-limit pipeline so it "just
-    # works": Speed Limit Control on, resolver routed to map data, and Assist mode so
-    # the longitudinal controller actually decelerates to the TMAP limit/camera over
-    # the remaining distance (resolver feeds speedLimitAhead + distance from TMAP).
+    # works": Speed Limit Control on, resolver routed to map data. The camera
+    # deceleration itself is fully automatic and handled in the longitudinal planner
+    # (caps the target at the live TMAP camera limit, no stalk confirmation), so we use
+    # warning mode -- the onroad sign still shows but the Assist confirm/arrow state
+    # machine stays disabled. RoadNameToggle shows the TMAP road name = connection cue.
     if param == "EnableTmapSpeedLimit" and state:
       try:
         self._params.put_bool("EnableSpeedLimitControl", True)
         self._params.put("SpeedLimitPolicy", 1)  # Policy.map_data_only
-        self._params.put("SpeedLimitMode", 3)     # Mode.assist (auto-decelerate to limit)
+        self._params.put("SpeedLimitMode", 2)     # Mode.warning (sign shown; auto-decel via planner)
         self._params.put_bool("RoadNameToggle", True)  # show TMAP road name onroad = connection indicator
       except UnknownKeyName:
         pass

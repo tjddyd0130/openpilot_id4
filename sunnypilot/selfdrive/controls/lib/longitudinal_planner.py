@@ -69,6 +69,15 @@ class LongitudinalPlannerSP:
       LongitudinalPlanSource.speedLimitAssist: (self.sla.output_v_target, self.sla.output_a_target),
     }
 
+    # tjddyd TMAP fully-auto camera deceleration: when the resolver holds a live
+    # camera/section limit (only set while within braking distance of a TMAP camera),
+    # cap the longitudinal target at it with no stalk confirmation. The normal MPC
+    # brakes smoothly to the lower target; it auto-releases once the camera is passed
+    # (resolver.speed_limit returns to 0). Gated on EnableTmapSpeedLimit (off by default),
+    # so every other configuration is unaffected.
+    if self.resolver.use_tmap and self.resolver.speed_limit > 0.:
+      targets[LongitudinalPlanSource.speedLimitAssist] = (self.resolver.speed_limit_final, a_ego)
+
     self.source = min(targets, key=lambda k: targets[k][0])
     self.output_v_target, self.output_a_target = targets[self.source]
     return self.output_v_target, self.output_a_target

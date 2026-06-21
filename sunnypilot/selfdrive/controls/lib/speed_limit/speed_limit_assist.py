@@ -61,7 +61,10 @@ class SpeedLimitAssist:
     self.pre_active_timer = 0
     self.is_metric = self.params.get_bool("IsMetric")
     set_speed_limit_assist_availability(self.CP, self.CP_SP, self.params)
-    self.enabled = self.params.get("SpeedLimitMode", return_default=True) == Mode.assist
+    # tjddyd: TMAP camera deceleration is fully automatic and handled in the planner,
+    # so keep this confirm/arrow state machine disabled whenever TMAP is the source.
+    self.use_tmap = self.params.get_bool("EnableTmapSpeedLimit")
+    self.enabled = self.params.get("SpeedLimitMode", return_default=True) == Mode.assist and not self.use_tmap
     self.long_enabled = False
     self.long_enabled_prev = False
     self.is_enabled = False
@@ -143,7 +146,8 @@ class SpeedLimitAssist:
     if self.frame % int(PARAMS_UPDATE_PERIOD / DT_MDL) == 0:
       self.is_metric = self.params.get_bool("IsMetric")
       set_speed_limit_assist_availability(self.CP, self.CP_SP, self.params)
-      self.enabled = self.params.get("SpeedLimitMode", return_default=True) == Mode.assist
+      self.use_tmap = self.params.get_bool("EnableTmapSpeedLimit")
+      self.enabled = self.params.get("SpeedLimitMode", return_default=True) == Mode.assist and not self.use_tmap
 
   def update_car_state(self, CS: car.CarState) -> None:
     now = time.monotonic()
