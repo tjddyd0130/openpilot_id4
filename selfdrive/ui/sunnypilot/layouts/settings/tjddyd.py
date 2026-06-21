@@ -196,10 +196,13 @@ class TjddydLayout(Widget):
       pass
 
     # Enabling the TMAP source wires up the rest of the speed-limit pipeline so it
-    # "just works": turn on Speed Limit Control and route the resolver to map data.
+    # "just works": turn on Speed Limit Control, route the resolver to map data, and
+    # set the mode to Info (show the limit sign) instead of Assist - the button-based
+    # Assist behaviour is not wanted in Korea.
     if param == "EnableTmapSpeedLimit" and state:
       try:
         self._params.put_bool("EnableSpeedLimitControl", True)
         self._params.put("SpeedLimitPolicy", 1)  # Policy.map_data_only
+        self._params.put("SpeedLimitMode", 1)     # Mode.information (sign only, no Assist)
       except UnknownKeyName:
         pass
