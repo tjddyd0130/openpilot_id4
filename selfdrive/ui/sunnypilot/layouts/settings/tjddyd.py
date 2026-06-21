@@ -204,5 +204,6 @@ class TjddydLayout(Widget):
         self._params.put_bool("EnableSpeedLimitControl", True)
         self._params.put("SpeedLimitPolicy", 1)  # Policy.map_data_only
         self._params.put("SpeedLimitMode", 3)     # Mode.assist (auto-decelerate to limit)
+        self._params.put_bool("RoadNameToggle", True)  # show TMAP road name onroad = connection indicator
       except UnknownKeyName:
         pass
