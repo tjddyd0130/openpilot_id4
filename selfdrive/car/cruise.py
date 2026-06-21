@@ -19,6 +19,7 @@ IMPERIAL_INCREMENT = round(CV.MPH_TO_KPH, 1)  # round here to avoid rounding err
 ButtonEvent = car.CarState.ButtonEvent
 ButtonType = car.CarState.ButtonEvent.Type
 CRUISE_LONG_PRESS = 50
+STUFE2_LATCH_FRAMES = 50  # tjddyd: hold the VW stalk 2nd-detent across the press->release gap
 CRUISE_NEAREST_FUNC = {
   ButtonType.accelCruise: math.ceil,
   ButtonType.decelCruise: math.floor,
@@ -48,6 +49,12 @@ class VCruiseHelper(VCruiseHelperSP):
   def update_v_cruise(self, CS, enabled, is_metric, speed_limit_control=False, speed_limit_predicative=False, gra_tip_stufe2=False):
     self.v_cruise_kph_last = self.v_cruise_kph
     self.gra_tip_stufe2 = gra_tip_stufe2  # tjddyd VW MEB: cruise stalk 2nd detent (big step)
+    # Latch the 2nd detent while pressed so it is still set when the tap is applied on the
+    # button release frame (by which point the stalk -- and Stufe_2 -- has returned to neutral).
+    if gra_tip_stufe2:
+      self.gra_tip_stufe2_latch = STUFE2_LATCH_FRAMES
+    elif self.gra_tip_stufe2_latch > 0:
+      self.gra_tip_stufe2_latch -= 1
 
     self.get_minimum_set_speed(is_metric)
 
@@ -135,10 +142,12 @@ class VCruiseHelper(VCruiseHelperSP):
       return
 
     # tjddyd VW MEB opt-in: cruise stalk 2nd detent (GRA_Tip_Stufe_2) forces a big step.
-    # Only effective with openpilot longitudinal control (pcmCruise=False).
-    if (self.stalk_big_step and self.is_meb and self.gra_tip_stufe2 and
+    # Use the latch (not the instantaneous signal): a tap is applied on release, when the
+    # stalk has already returned to neutral. Only effective with openpilot long (pcmCruise=False).
+    if (self.stalk_big_step and self.is_meb and self.gra_tip_stufe2_latch > 0 and
         button_type in (ButtonType.accelCruise, ButtonType.decelCruise)):
       long_press = True
+      self.gra_tip_stufe2_latch = 0  # consume so it applies to this press only
 
     long_press, v_cruise_delta = VCruiseHelperSP.update_v_cruise_delta(self, long_press, v_cruise_delta)
     if long_press and self.v_cruise_kph % v_cruise_delta != 0:  # partial interval

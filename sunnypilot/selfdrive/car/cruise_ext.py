@@ -55,6 +55,9 @@ class VCruiseHelperSP:
     # tjddyd VW MEB opt-in convenience features (gated to MEB via self.is_meb, set by card.py)
     self.is_meb = False
     self.gra_tip_stufe2 = False
+    # the stalk returns to neutral (Stufe_2 -> 0) by the time a tap is applied on button
+    # release, so latch the 2nd-detent for a short window so the big step survives the release
+    self.gra_tip_stufe2_latch = 0
     self.auto_gas_sync = self.params.get_bool("AutoGasSyncSpeed")
     self.stalk_big_step = self.params.get_bool("EnableStalkBigStep")
 
