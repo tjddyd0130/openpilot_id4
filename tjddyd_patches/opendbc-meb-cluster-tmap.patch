@@ -1,0 +1,73 @@
+From 38c07fb8e9f15a0461555216e34d39845dcf3833 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 21 Jun 2026 13:58:00 +0000
+Subject: [PATCH] VW MEB: show TMAP road speed limit on the cluster
+ (ACC_Tempolimit)
+
+EU MEB cars (e.g. Korea) have no native predictive-nav speed limit, so the
+SpeedLimitManager always returns 0 and the cluster speed-limit field stays
+empty. Fall back to the TMAP road limit -- written by the openpilot mapd to
+the TmapRoadLimit param at ~1Hz -- when the native limit is absent on MEB.
+
+Only cruiseState.speedLimit (the car source) is populated and the openpilot
+speed-limit policy is map_data_only, so this is display-only and never caps
+speed. The param read is throttled and the openpilot Params import is guarded
+so opendbc still imports standalone.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_015XiGYrFo4VxceB8UKz4mPV
+---
+ opendbc/car/volkswagen/carstate.py | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+
+diff --git a/opendbc/car/volkswagen/carstate.py b/opendbc/car/volkswagen/carstate.py
+index f7126579..4e64aeec 100644
+--- a/opendbc/car/volkswagen/carstate.py
++++ b/opendbc/car/volkswagen/carstate.py
+@@ -9,6 +9,13 @@ from opendbc.car.volkswagen.values import DBC, CanBus, NetworkLocation, Transmis
+ from opendbc.car.volkswagen.speed_limit_manager import SpeedLimitManager
+ from opendbc.sunnypilot.car.volkswagen.mads import MadsCarState
+ 
++# tjddyd: optional openpilot Params, used only to read the TMAP road limit for the MEB
++# cluster display. Guarded so opendbc keeps importing standalone (e.g. for unit tests).
++try:
++  from openpilot.common.params import Params
++except Exception:
++  Params = None
++
+ ButtonType = structs.CarState.ButtonEvent.Type
+ 
+ 
+@@ -30,6 +37,9 @@ class CarState(CarStateBase, MadsCarState):
+     self.enable_pred_react_to_curves = False
+     self.speed_limit_mgr = SpeedLimitManager(CP, speed_limit_max_kph=120, predicative=False, predicative_speed_limit=False, predicative_curve=False)
+     self.speed_limit_predicative_type = 0
++    # tjddyd: TMAP road limit (m/s) for the MEB cluster display, refreshed ~2x/sec from a param
++    self._tmap_params = Params() if Params is not None else None
++    self._tmap_cluster_speed_limit = 0.
+     self.force_rhd_for_bsm = False
+     self.acc_type = 0
+     self.hca_status_last = None
+@@ -383,6 +393,19 @@ class CarState(CarStateBase, MadsCarState):
+     ret.cruiseState.speedLimitPredicative = self.speed_limit_mgr.get_speed_limit_predicative()
+     self.speed_limit_predicative_type = self.speed_limit_mgr.get_speed_limit_predicative_type()
+ 
++    # tjddyd: EU MEB has no Korean nav PSD, so the cluster speed limit is always empty. Fall
++    # back to the TMAP road limit (written by the openpilot mapd at ~1Hz) so the cluster
++    # (ACC_Tempolimit) shows it. Read throttled to avoid per-frame param IO. Only the car
++    # source is touched and the speed-limit policy is map_data_only, so this never caps speed.
++    if self._tmap_params is not None and (self.CP.flags & VolkswagenFlags.MEB):
++      if self.frame % 50 == 0:
++        try:
++          self._tmap_cluster_speed_limit = int(self._tmap_params.get("TmapRoadLimit", return_default=True)) * CV.KPH_TO_MS
++        except Exception:
++          self._tmap_cluster_speed_limit = 0.
++      if ret.cruiseState.speedLimit == 0 and self._tmap_cluster_speed_limit > 0:
++        ret.cruiseState.speedLimit = self._tmap_cluster_speed_limit
++
+     ret_sp.speedLimit = ret.cruiseState.speedLimit
+     
+     # Update button states for turn signals and ACC controls, capture all ACC button state/config for passthrough
+-- 
+2.43.0
+
