@@ -19,6 +19,20 @@ from openpilot.selfdrive.ui.ui_state import ui_state
 if gui_app.sunnypilot_ui():
   from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp as toggle_item
 
+from openpilot.system.ui.sunnypilot.widgets.list_view import option_item_sp
+
+# TMAP (carrot AutoNavi) numeric options: (param, title, min, max, step)
+TMAP_OPTIONS = [
+  ("AutoNaviSpeedCtrlMode", "TMAP: Speed Control Mode (0=off,1=cam,2=+bump,3=+mobile)", 0, 3, 1),
+  ("AutoNaviSpeedSafetyFactor", "TMAP: Speed Limit Safety Factor (%)", 80, 130, 5),
+  ("AutoNaviSpeedDecelRate", "TMAP: Decel Rate (x0.01 m/s^2)", 50, 200, 10),
+  ("AutoNaviSpeedCtrlEnd", "TMAP: Control End Time (s)", 0, 30, 1),
+  ("AutoNaviSpeedBumpSpeed", "TMAP: Speed Bump Speed (km/h)", 10, 60, 5),
+  ("AutoNaviSpeedBumpTime", "TMAP: Speed Bump Time (s)", 0, 5, 1),
+  ("AutoNaviCountDownMode", "TMAP: Countdown Mode", 0, 2, 1),
+  ("AutoRoadSpeedLimitOffset", "TMAP: Road Speed Limit Offset (km/h)", -10, 10, 1),
+]
+
 # Description constants
 DESCRIPTIONS = {
   "DisableDM": tr_noop(
@@ -117,7 +131,19 @@ class TjddydLayout(Widget):
       toggle.set_description(lambda og_desc=toggle.description: tr(og_desc))
       self._toggles[param] = toggle
 
-    self._scroller = Scroller(list(self._toggles.values()), line_separator=True, spacing=0)
+    # TMAP/KakaoNavi numeric options (carrot AutoNavi params), only active when TMAP is on
+    items = list(self._toggles.values())
+    for opt_param, opt_title, opt_min, opt_max, opt_step in TMAP_OPTIONS:
+      items.append(option_item_sp(
+        title=(lambda t=opt_title: tr(t)),
+        param=opt_param,
+        min_value=opt_min,
+        max_value=opt_max,
+        value_change_step=opt_step,
+        enabled=lambda: ui_state.params.get_bool("EnableTmapSpeedLimit"),
+      ))
+
+    self._scroller = Scroller(items, line_separator=True, spacing=0)
 
   def _update_state(self):
     return
