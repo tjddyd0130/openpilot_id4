@@ -59,6 +59,11 @@ class SpeedLimitResolver:
     for source in ALL_SOURCES:
       self._reset_limit_sources(source)
 
+    # tjddyd: when the phone-nav (TMAP) source is active, the limit + distance come
+    # straight from the phone with a live countdown, so we bypass the GPS-fix aging
+    # (which assumes an OSM/GPS pipeline and is a no-op / broken without a GPS fix).
+    self.use_tmap = self.params.get_bool("EnableTmapSpeedLimit")
+
     self.is_metric = self.params.get_bool("IsMetric")
     self.offset_type = get_sanitize_int_param(
       "SpeedLimitOffsetType",
@@ -92,6 +97,7 @@ class SpeedLimitResolver:
   def update_params(self):
     if self.frame % int(PARAMS_UPDATE_PERIOD / DT_MDL) == 0:
       self.policy = self.params.get("SpeedLimitPolicy", return_default=True)
+      self.use_tmap = self.params.get_bool("EnableTmapSpeedLimit")
       self.is_metric = self.params.get_bool("IsMetric")
       self.offset_type = self.params.get("SpeedLimitOffsetType", return_default=True)
       self.offset_value = self.params.get("SpeedLimitValueOffset", return_default=True)
@@ -120,17 +126,40 @@ class SpeedLimitResolver:
     self._process_map_data(sm)
 
   def _process_map_data(self, sm: messaging.SubMaster) -> None:
-    gps_data = sm[self._gps_location_service]
     map_data = sm['liveMapDataSP']
-
-    gps_fix_age = time.monotonic() - gps_data.unixTimestampMillis * 1e-3
-    if gps_fix_age > LIMIT_MAX_MAP_DATA_AGE:
-      return
 
     speed_limit = map_data.speedLimit if map_data.speedLimitValid else 0.
     next_speed_limit = map_data.speedLimitAhead if map_data.speedLimitAheadValid else 0.
 
+    # tjddyd TMAP: the phone supplies a live distance countdown to the camera, so use
+    # it directly and skip the GPS-fix aging (no GPS dependency, no monotonic/epoch mix).
+    if self.use_tmap:
+      self._calculate_map_data_limits_tmap(speed_limit, next_speed_limit, map_data.speedLimitAheadDistance)
+      return
+
+    gps_data = sm[self._gps_location_service]
+    gps_fix_age = time.monotonic() - gps_data.unixTimestampMillis * 1e-3
+    if gps_fix_age > LIMIT_MAX_MAP_DATA_AGE:
+      return
+
     self._calculate_map_data_limits(sm, speed_limit, next_speed_limit)
+
+  def _calculate_map_data_limits_tmap(self, speed_limit: float, next_speed_limit: float, distance_ahead: float) -> None:
+    # Mirror _calculate_map_data_limits but trust the phone-supplied distance directly.
+    self.limit_solutions[SpeedLimitSource.map] = speed_limit
+    self.distance_solutions[SpeedLimitSource.map] = 0.
+
+    distance_to_speed_limit_ahead = max(0., distance_ahead)
+
+    # Switch to the upcoming camera/section limit once we are within the braking distance
+    # needed to reach it at LIMIT_ADAPT_ACC; the assist then brakes smoothly over distance.
+    if 0. < next_speed_limit < self.v_ego:
+      adapt_time = (next_speed_limit - self.v_ego) / LIMIT_ADAPT_ACC
+      adapt_distance = self.v_ego * adapt_time + 0.5 * LIMIT_ADAPT_ACC * adapt_time ** 2
+
+      if distance_to_speed_limit_ahead <= adapt_distance:
+        self.limit_solutions[SpeedLimitSource.map] = next_speed_limit
+        self.distance_solutions[SpeedLimitSource.map] = distance_to_speed_limit_ahead
 
   def _calculate_map_data_limits(self, sm: messaging.SubMaster, speed_limit: float, next_speed_limit: float) -> None:
     gps_data = sm[self._gps_location_service]
