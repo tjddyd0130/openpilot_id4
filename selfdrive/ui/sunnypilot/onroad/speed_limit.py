@@ -190,12 +190,11 @@ class SpeedLimitRenderer(Widget, SpeedLimitAlertRenderer):
 
     alpha = self._pre_active_fade.alpha
 
-    # tjddyd camera-centric: the TMAP source intentionally reports no current road
-    # limit (get_current_speed_limit()==0), so speed_limit_valid is False on open road
-    # and the sign stays hidden. When a speed camera is ahead the limit lives only in
-    # speed_limit_ahead (liveMapDataSP), so also show the main sign for the upcoming
-    # camera -- the red sign then appears as you approach a camera zone (~200m out).
-    has_limit = self.speed_limit_valid or self.speed_limit_last_valid
+    # tjddyd camera-centric: use the LIVE resolver limit only (not the sticky
+    # speed_limit_last, which never resets -- that left the sign stuck showing the last
+    # camera value forever). The sign shows while a camera is being actively limited
+    # (speed_limit_valid) or is still ahead (speed_limit_ahead), and clears after passing.
+    has_limit = self.speed_limit_valid
     has_ahead = self.speed_limit_ahead_valid and self.speed_limit_ahead > 0
 
     if ui_state.speed_limit_mode != SpeedLimitMode.off and (has_limit or has_ahead):
@@ -207,13 +206,13 @@ class SpeedLimitRenderer(Widget, SpeedLimitAlertRenderer):
 
   def _draw_sign_main(self, rect, alpha=1.0):
     speed_limit_warning_enabled = ui_state.speed_limit_mode >= SpeedLimitMode.warning
-    has_limit = self.speed_limit_valid or self.speed_limit_last_valid
+    has_limit = self.speed_limit_valid
     has_ahead = self.speed_limit_ahead_valid and self.speed_limit_ahead > 0
 
-    # camera-centric: when there is no active road limit but a camera is ahead, show
-    # the upcoming camera's limit on the sign (grey, since it isn't enforced yet).
+    # camera-centric: show the live limit while it is actively enforced, otherwise the
+    # upcoming camera's limit (grey). No sticky last value, so it clears after passing.
     if has_limit:
-      display_limit = self.speed_limit_last
+      display_limit = self.speed_limit
     elif has_ahead:
       display_limit = self.speed_limit_ahead
     else:
