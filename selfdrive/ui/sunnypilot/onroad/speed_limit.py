@@ -108,6 +108,7 @@ class SpeedLimitRenderer(Widget, SpeedLimitAlertRenderer):
     self.speed_limit_ahead_dist = 0.0
     self.speed_limit_ahead_dist_prev = 0.0
     self.speed_limit_ahead_valid = False
+    self.speed_limit_ahead_is_bump = False
     self.speed_limit_ahead_frame = 0
 
     self.is_cruise_set: bool = False
@@ -151,6 +152,7 @@ class SpeedLimitRenderer(Widget, SpeedLimitAlertRenderer):
       self.speed_limit_ahead_valid = lmd.speedLimitAheadValid
       self.speed_limit_ahead = lmd.speedLimitAhead * self.speed_conv
       self.speed_limit_ahead_dist = lmd.speedLimitAheadDistance
+      self.speed_limit_ahead_is_bump = bool(getattr(lmd, "speedLimitAheadIsBump", False))
 
       if self.speed_limit_ahead_dist < self.speed_limit_ahead_dist_prev and self.speed_limit_ahead_frame < AHEAD_THRESHOLD:
         self.speed_limit_ahead_frame += 1
@@ -198,11 +200,16 @@ class SpeedLimitRenderer(Widget, SpeedLimitAlertRenderer):
     has_ahead = self.speed_limit_ahead_valid and self.speed_limit_ahead > 0
 
     if ui_state.speed_limit_mode != SpeedLimitMode.off and (has_limit or has_ahead):
-      self._draw_sign_main(sign_rect, alpha)
-      if self.speed_limit_assist_state == AssistState.preActive:
-        self._draw_pre_active_arrow(sign_rect)
+      if self.speed_limit_ahead_is_bump:
+        # a speed bump is not a posted speed limit -> show a distinct BUMP indicator
+        # (a speed-bump glyph + pass speed) instead of the red speed-limit sign.
+        self._draw_bump_info(sign_rect)
       else:
-        self._draw_ahead_info(sign_rect)
+        self._draw_sign_main(sign_rect, alpha)
+        if self.speed_limit_assist_state == AssistState.preActive:
+          self._draw_pre_active_arrow(sign_rect)
+        else:
+          self._draw_ahead_info(sign_rect)
 
   def _draw_sign_main(self, rect, alpha=1.0):
     speed_limit_warning_enabled = ui_state.speed_limit_mode >= SpeedLimitMode.warning
@@ -303,6 +310,27 @@ class SpeedLimitRenderer(Widget, SpeedLimitAlertRenderer):
 
       f_scale = 0.6 if len(sub) < 3 else 0.475
       self._draw_text_centered(self.font_bold, sub, int(box_sz * f_scale), rl.Vector2(s_rect.x + box_sz / 2, s_rect.y + box_sz / 2), white)
+
+  def _draw_bump_info(self, rect):
+    # Distinct speed-bump indicator (not a speed-limit sign): a dark rounded panel with a
+    # "BUMP" label, a speed-bump glyph (road line + hump) and the target pass speed + distance.
+    rl.draw_rectangle_rounded(rect, 0.2, 10, Colors.SUB_BG)
+    rl.draw_rectangle_rounded_lines_ex(rect, 0.2, 10, 3, Colors.MUTCD_LINES)
+
+    mid_x = rect.x + rect.width / 2
+    self._draw_text_centered(self.font_demi, "BUMP", 34, rl.Vector2(mid_x, rect.y + 32), Colors.GREY)
+
+    # speed-bump glyph: a road baseline with a hump sitting on it
+    base_y = rect.y + rect.height * 0.46
+    half_w = rect.width * 0.30
+    rl.draw_line_ex(rl.Vector2(mid_x - half_w, base_y), rl.Vector2(mid_x + half_w, base_y), 5, Colors.WHITE)
+    # filled half-disc hump (draw_ring with inner radius 0 == filled sector)
+    rl.draw_ring(rl.Vector2(mid_x, base_y), 0, rect.width * 0.16, 180, 360, 32, Colors.WHITE)
+
+    self._draw_text_centered(self.font_bold, str(round(self.speed_limit_ahead)), 54,
+                             rl.Vector2(mid_x, rect.y + rect.height - 70), Colors.WHITE)
+    self._draw_text_centered(self.font_norm, self._format_dist(self.speed_limit_ahead_dist), 30,
+                             rl.Vector2(mid_x, rect.y + rect.height - 28), Colors.GREY)
 
   def _draw_ahead_info(self, sign_rect):
     source_is_map = self.speed_limit_source == SpeedLimitSource.map
