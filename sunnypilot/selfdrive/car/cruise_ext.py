@@ -60,6 +60,9 @@ class VCruiseHelperSP:
     self.gra_tip_stufe2_latch = 0
     self.auto_gas_sync = self.params.get_bool("AutoGasSyncSpeed")
     self.stalk_big_step = self.params.get_bool("EnableStalkBigStep")
+    # TMAP camera-centric: keep the user's set speed; the planner caps the target instead of
+    # slaving the set speed to the camera limit (so 80 stays 80 and restores after the camera).
+    self.use_tmap = self.params.get_bool("EnableTmapSpeedLimit")
 
     self.enable_button_timers = CRUISE_BUTTON_TIMER
 
@@ -80,6 +83,9 @@ class VCruiseHelperSP:
     # tjddyd VW MEB opt-in convenience features
     self.auto_gas_sync = self.params.get_bool("AutoGasSyncSpeed")
     self.stalk_big_step = self.params.get_bool("EnableStalkBigStep")
+    # TMAP camera-centric: keep the user's set speed; the planner caps the target instead of
+    # slaving the set speed to the camera limit (so 80 stays 80 and restores after the camera).
+    self.use_tmap = self.params.get_bool("EnableTmapSpeedLimit")
 
   def update_v_cruise_delta(self, long_press: bool, v_cruise_delta: float) -> tuple[bool, float]:
     if not self.custom_acc_enabled:
@@ -142,6 +148,8 @@ class VCruiseHelperSP:
     return False
 
   def update_speed_limit_assist_v_cruise_non_pcm(self) -> None:
+    if self.use_tmap:  # TMAP keeps the set speed; deceleration is handled by the planner cap
+      return
     if self.sla_state in SLA_ACTIVE_STATES and (self.prev_sla_state not in SLA_ACTIVE_STATES or
                                                 self.update_speed_limit_final_last_changed):
       self.v_cruise_kph = np.clip(round(self.speed_limit_final_last_kph, 1), self.v_cruise_min, V_CRUISE_MAX)

@@ -85,7 +85,13 @@ class VCruiseHelper(VCruiseHelperSP):
       self.update_button_timers(CS, enabled)
 
   def _update_v_speed_limit(self, CS, enabled, speed_limit_control, predicative):
-    if not speed_limit_control: # or not enabled # always set speed limit
+    if not speed_limit_control:  # or not enabled # always set speed limit
+      return
+
+    # tjddyd TMAP: do NOT slave the set speed to the (camera-centric) cruiseState.speedLimit.
+    # We inject the camera limit there only for the cluster display; the planner caps the
+    # longitudinal target instead, so the user's set speed stays put and restores after passing.
+    if self.use_tmap:
       return
 
     speed_limit_current = CS.cruiseState.speedLimit * CV.MS_TO_KPH
