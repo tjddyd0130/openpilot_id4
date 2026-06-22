@@ -299,20 +299,21 @@ class TmapMapData(BaseMapData):
     live_map_data.speedLimitAheadValid = bool(MAX_SPEED_LIMIT > next_speed_limit > 0)
     live_map_data.speedLimitAhead = next_speed_limit
     live_map_data.speedLimitAheadDistance = next_speed_limit_distance
+    live_map_data.speedLimitAheadIsBump = bool(next_speed_limit > 0 and self.xSpdType == 22)
     live_map_data.roadName = self.get_current_road_name()
     self.pm.send('liveMapDataSP', mapd_sp_send)
 
     # publish a human-readable status for the UI (tjddyd tab)
     with self._lock:
       if self._fresh():
-        limit = f"{int(self.nRoadLimitSpeed)}km/h" if self.nRoadLimitSpeed >= MIN_VALID_SPEED_LIMIT else "없음"
-        status = f"연결됨 · 제한 {limit} · {self._remote_ip}"
+        limit = f"{int(self.nRoadLimitSpeed)}km/h" if self.nRoadLimitSpeed >= MIN_VALID_SPEED_LIMIT else "none"
+        status = f"Connected - limit {limit} - {self._remote_ip}"
         # cluster shows the upcoming CAMERA limit only (camera-centric): xSpdLimit is non-zero
         # while a speed camera is ahead and clears to 0 after passing. Exclude speed bumps
         # (xSpdType 22) so only camera warnings light up the dash.
         cluster_limit = int(round(self.xSpdLimit)) if (self.xSpdLimit > 0 and self.xSpdType != 22) else 0
       else:
-        status = "수신 없음 · 폰 앱/네트워크 확인"
+        status = "No data - check phone app / network"
         cluster_limit = 0
     self.params.put("TmapStatus", status)
     # Camera speed limit (kph) for the MEB cluster (ACC_Tempolimit): appears at a speed

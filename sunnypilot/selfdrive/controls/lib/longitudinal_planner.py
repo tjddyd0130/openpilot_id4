@@ -69,14 +69,19 @@ class LongitudinalPlannerSP:
       LongitudinalPlanSource.speedLimitAssist: (self.sla.output_v_target, self.sla.output_a_target),
     }
 
-    # tjddyd TMAP fully-auto camera deceleration: when the resolver holds a live
-    # camera/section limit (only set while within braking distance of a TMAP camera),
-    # cap the longitudinal target at it with no stalk confirmation. The normal MPC
-    # brakes smoothly to the lower target; it auto-releases once the camera is passed
-    # (resolver.speed_limit returns to 0). Gated on EnableTmapSpeedLimit (off by default),
-    # so every other configuration is unaffected.
+    # tjddyd TMAP fully-auto camera/bump deceleration (carrot-style, no stalk confirmation):
+    # the resolver exposes the event limit + live distance while a camera/bump is ahead. Shape
+    # the decel as a kinematic ramp so the car slows along AutoNaviSpeedDecelRate and reaches
+    # the limit ~CtrlEnd (camera) / BumpTime (bump) seconds before the event. The ramp target is
+    # high when far (no effect -- cruise wins the min) and falls to the limit as you approach;
+    # it auto-releases once the event clears (resolver.speed_limit -> 0), restoring set speed.
+    # Gated on EnableTmapSpeedLimit (off by default), so every other configuration is unaffected.
     if self.resolver.use_tmap and self.resolver.speed_limit > 0.:
-      targets[LongitudinalPlanSource.speedLimitAssist] = (self.resolver.speed_limit_final, a_ego)
+      v_limit = self.resolver.speed_limit_final
+      end_s = self.resolver.tmap_bump_time if self.resolver.tmap_ahead_is_bump else self.resolver.tmap_ctrl_end
+      decel_dist = max(0., self.resolver.distance - v_limit * end_s)
+      ramp_target = max(v_limit, (v_limit ** 2 + 2.0 * self.resolver.tmap_decel_rate * decel_dist) ** 0.5)
+      targets[LongitudinalPlanSource.speedLimitAssist] = (ramp_target, a_ego)
 
     self.source = min(targets, key=lambda k: targets[k][0])
     self.output_v_target, self.output_a_target = targets[self.source]

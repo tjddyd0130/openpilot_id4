@@ -63,7 +63,11 @@ class SpeedLimitResolver:
     # straight from the phone with a live countdown, so we bypass the GPS-fix aging
     # (which assumes an OSM/GPS pipeline and is a no-op / broken without a GPS fix).
     self.use_tmap = self.params.get_bool("EnableTmapSpeedLimit")
-    self._tmap_cap_engaged = False  # latch: holding the camera limit until the camera is passed
+    # carrot AutoNavi deceleration params (used by the planner to shape the decel curve)
+    self.tmap_decel_rate = 1.2   # m/s^2 (AutoNaviSpeedDecelRate * 0.01)
+    self.tmap_ctrl_end = 7.0     # s, finish decel this many seconds before a camera
+    self.tmap_bump_time = 1.0    # s, finish decel this many seconds before a speed bump
+    self.tmap_ahead_is_bump = False
 
     self.is_metric = self.params.get_bool("IsMetric")
     self.offset_type = get_sanitize_int_param(
@@ -102,6 +106,10 @@ class SpeedLimitResolver:
       self.is_metric = self.params.get_bool("IsMetric")
       self.offset_type = self.params.get("SpeedLimitOffsetType", return_default=True)
       self.offset_value = self.params.get("SpeedLimitValueOffset", return_default=True)
+      if self.use_tmap:
+        self.tmap_decel_rate = max(0.1, self.params.get("AutoNaviSpeedDecelRate", return_default=True) * 0.01)
+        self.tmap_ctrl_end = float(self.params.get("AutoNaviSpeedCtrlEnd", return_default=True))
+        self.tmap_bump_time = float(self.params.get("AutoNaviSpeedBumpTime", return_default=True))
 
   def _get_speed_limit_offset(self) -> float:
     if self.offset_type == OffsetType.off:
@@ -135,6 +143,7 @@ class SpeedLimitResolver:
     # tjddyd TMAP: the phone supplies a live distance countdown to the camera, so use
     # it directly and skip the GPS-fix aging (no GPS dependency, no monotonic/epoch mix).
     if self.use_tmap:
+      self.tmap_ahead_is_bump = bool(getattr(map_data, "speedLimitAheadIsBump", False))
       self._calculate_map_data_limits_tmap(speed_limit, next_speed_limit, map_data.speedLimitAheadDistance)
       return
 
@@ -146,32 +155,16 @@ class SpeedLimitResolver:
     self._calculate_map_data_limits(sm, speed_limit, next_speed_limit)
 
   def _calculate_map_data_limits_tmap(self, speed_limit: float, next_speed_limit: float, distance_ahead: float) -> None:
-    # carrot-style camera deceleration: slow down approaching a camera, HOLD the camera
-    # limit until the camera is passed, then release so cruise restores the original set speed.
-    self.limit_solutions[SpeedLimitSource.map] = speed_limit
-    self.distance_solutions[SpeedLimitSource.map] = 0.
-
-    if next_speed_limit <= 0.:
-      # camera passed / none ahead -> release the hold so the set speed is restored
-      self._tmap_cap_engaged = False
-      return
-
-    distance_to_speed_limit_ahead = max(0., distance_ahead)
-
-    # Engage once within the braking distance needed to reach the camera limit at
-    # LIMIT_ADAPT_ACC (and we actually need to slow). Once engaged, keep holding the limit
-    # while the camera is still ahead -- even after we have slowed down to it -- so the car
-    # does not speed back up just before the camera. The hold is released above the moment
-    # the camera clears from the TMAP data (i.e. once it is behind us).
-    if not self._tmap_cap_engaged and 0. < next_speed_limit < self.v_ego:
-      adapt_time = (next_speed_limit - self.v_ego) / LIMIT_ADAPT_ACC
-      adapt_distance = self.v_ego * adapt_time + 0.5 * LIMIT_ADAPT_ACC * adapt_time ** 2
-      if distance_to_speed_limit_ahead <= adapt_distance:
-        self._tmap_cap_engaged = True
-
-    if self._tmap_cap_engaged:
+    # carrot-style camera/bump handling: expose the event limit + the live distance to it
+    # whenever one is ahead. The planner shapes the actual deceleration curve from these
+    # (AutoNaviSpeedDecelRate / CtrlEnd / BumpTime), and the set speed is restored the moment
+    # the event clears from the TMAP data (next_speed_limit -> 0, i.e. it is behind us).
+    if next_speed_limit > 0.:
       self.limit_solutions[SpeedLimitSource.map] = next_speed_limit
-      self.distance_solutions[SpeedLimitSource.map] = distance_to_speed_limit_ahead
+      self.distance_solutions[SpeedLimitSource.map] = max(0., distance_ahead)
+    else:
+      self.limit_solutions[SpeedLimitSource.map] = speed_limit  # 0 in camera-centric mode
+      self.distance_solutions[SpeedLimitSource.map] = 0.
 
   def _calculate_map_data_limits(self, sm: messaging.SubMaster, speed_limit: float, next_speed_limit: float) -> None:
     gps_data = sm[self._gps_location_service]
