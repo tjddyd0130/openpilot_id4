@@ -82,6 +82,11 @@ DESCRIPTIONS = {
     "disables OSM map download. The phone app must broadcast data to the device. Applied after "
     "reboot."
   ),
+  "BlindSpot": tr_noop(
+    "Show blind-spot indicators on the onroad screen when a vehicle is detected on the left/right "
+    "(from the car's side-assist radar). Display only - it does NOT slow the car down (unlike the "
+    "factory side assist). Needs the car's blind-spot CAN (MEB_Side_Assist_01) to still be active."
+  ),
 }
 
 
@@ -126,6 +131,11 @@ class TjddydLayout(Widget):
         lambda: tr("T map / KakaoNavi speed limit (:7713)"),
         DESCRIPTIONS["EnableTmapSpeedLimit"],
         "speed_limit.png",
+      ),
+      "BlindSpot": (
+        lambda: tr("Blind-spot indicators (left/right cars)"),
+        DESCRIPTIONS["BlindSpot"],
+        "chffr_wheel.png",
       ),
     }
 
