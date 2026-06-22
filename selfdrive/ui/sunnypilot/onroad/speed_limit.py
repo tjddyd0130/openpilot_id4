@@ -312,25 +312,36 @@ class SpeedLimitRenderer(Widget, SpeedLimitAlertRenderer):
       self._draw_text_centered(self.font_bold, sub, int(box_sz * f_scale), rl.Vector2(s_rect.x + box_sz / 2, s_rect.y + box_sz / 2), white)
 
   def _draw_bump_info(self, rect):
-    # Distinct speed-bump indicator (not a speed-limit sign): a dark rounded panel with a
-    # "BUMP" label, a speed-bump glyph (road line + hump) and the target pass speed + distance.
-    rl.draw_rectangle_rounded(rect, 0.2, 10, Colors.SUB_BG)
-    rl.draw_rectangle_rounded_lines_ex(rect, 0.2, 10, 3, Colors.MUTCD_LINES)
+    # Standard speed-bump WARNING sign: a red-bordered white upward triangle with a black
+    # speed-bump glyph (road line + hump) inside. A bump is not a posted limit, so this is
+    # shown instead of the round speed-limit sign.
+    w, h = rect.width, rect.height
+    cx = rect.x + w / 2.0
+    tri_h = min(h - 16.0, w * 0.86)
+    half = min(tri_h / 1.732, w / 2.0 - 8.0)
+    top_y = rect.y + (h - tri_h) / 2.0
+    bot_y = top_y + tri_h
+    apex = (cx, top_y)
+    bl = (cx - half, bot_y)
+    br = (cx + half, bot_y)
+    gx = (apex[0] + bl[0] + br[0]) / 3.0
+    gy = (apex[1] + bl[1] + br[1]) / 3.0
 
-    mid_x = rect.x + rect.width / 2
-    self._draw_text_centered(self.font_demi, "BUMP", 34, rl.Vector2(mid_x, rect.y + 32), Colors.GREY)
+    def scaled(p, k):
+      return rl.Vector2(gx + (p[0] - gx) * k, gy + (p[1] - gy) * k)
 
-    # speed-bump glyph: a road baseline with a hump sitting on it
-    base_y = rect.y + rect.height * 0.46
-    half_w = rect.width * 0.30
-    rl.draw_line_ex(rl.Vector2(mid_x - half_w, base_y), rl.Vector2(mid_x + half_w, base_y), 5, Colors.WHITE)
-    # filled half-disc hump (draw_ring with inner radius 0 == filled sector)
-    rl.draw_ring(rl.Vector2(mid_x, base_y), 0, rect.width * 0.16, 180, 360, 32, Colors.WHITE)
+    def tri(a, b, c, color):  # draw both windings so the fill always renders
+      rl.draw_triangle(a, b, c, color)
+      rl.draw_triangle(a, c, b, color)
 
-    self._draw_text_centered(self.font_bold, str(round(self.speed_limit_ahead)), 54,
-                             rl.Vector2(mid_x, rect.y + rect.height - 70), Colors.WHITE)
-    self._draw_text_centered(self.font_norm, self._format_dist(self.speed_limit_ahead_dist), 30,
-                             rl.Vector2(mid_x, rect.y + rect.height - 28), Colors.GREY)
+    tri(rl.Vector2(*apex), rl.Vector2(*bl), rl.Vector2(*br), Colors.RED)        # red border
+    tri(scaled(apex, 0.72), scaled(bl, 0.72), scaled(br, 0.72), Colors.WHITE)   # white interior
+
+    # black speed-bump glyph in the lower middle: a road baseline with a hump
+    base_y = bot_y - tri_h * 0.18
+    gw = w * 0.22
+    rl.draw_line_ex(rl.Vector2(cx - gw, base_y), rl.Vector2(cx + gw, base_y), max(4.0, w * 0.025), Colors.BLACK)
+    rl.draw_ring(rl.Vector2(cx, base_y), 0, w * 0.15, 180, 360, 40, Colors.BLACK)
 
   def _draw_ahead_info(self, sign_rect):
     source_is_map = self.speed_limit_source == SpeedLimitSource.map
