@@ -1,5 +1,5 @@
 """
-tjddyd VW ID.4 (MEB) opt-in convenience features (Phase 1).
+tjddyd VW ID.4 (MEB) opt-in convenience features.
 
 These toggles only expose params. The runtime behaviour is gated to
 VW MEB (CP.brand == 'volkswagen' and CP.flags & VolkswagenFlags.MEB) in the
@@ -7,6 +7,8 @@ controls code, so enabling them has no effect on other platforms.
 
 DisableDM is the exception: driver monitoring runs device-wide
 and cannot be gated per car, so its description carries a safety warning.
+
+All UI text is intentionally English: the device UI font does not render Hangul.
 """
 from openpilot.common.params import Params, UnknownKeyName
 from openpilot.system.ui.widgets import Widget
@@ -22,60 +24,63 @@ if gui_app.sunnypilot_ui():
 from openpilot.system.ui.sunnypilot.widgets.list_view import option_item_sp
 
 # TMAP (carrot AutoNavi) numeric options: (param, title, description, min, max, step)
-# Titles/descriptions and ranges ported from carrot (selfdrive/carrot_settings.json).
+# Ranges ported from carrot (selfdrive/carrot_settings.json).
 TMAP_OPTIONS = [
-  ("AutoNaviSpeedCtrlMode", "네비게이션 감속모드",
-   "0: 감속안함  1: 과속카메라  2: +과속방지턱  3: +이동식카메라", 0, 3, 1),
-  ("AutoNaviSpeedSafetyFactor", "과속카메라 제한속도 적용율(%)",
-   "과속카메라에서 도로제한속도 × 설정값(%)으로 감속합니다", 80, 120, 1),
-  ("AutoNaviSpeedDecelRate", "과속카메라 감속율(×0.01 m/s²)",
-   "낮을수록 더 멀리서부터 천천히 감속합니다", 50, 300, 10),
-  ("AutoNaviSpeedCtrlEnd", "과속카메라 감속 완료시간(초)",
-   "감속 종료 시점을 설정합니다", 3, 20, 1),
-  ("AutoNaviSpeedBumpSpeed", "과속방지턱 통과속도(km/h)",
-   "과속방지턱을 통과할 목표 속도", 10, 100, 5),
-  ("AutoNaviSpeedBumpTime", "사고방지턱 감속완료 시점(초)",
-   "사고방지턱 감속을 끝낼 시점", 1, 50, 1),
-  ("AutoNaviCountDownMode", "네비 알림 카운트다운",
-   "0: 알림없음  1: 턴지점+속도  2: 턴지점+속도+방지턱", 0, 2, 1),
-  ("AutoRoadSpeedLimitOffset", "도로제한속도 맞춤(offset)",
-   "도로제한속도 + 설정값. -1이면 미적용", -1, 100, 1),
+  ("AutoNaviSpeedCtrlMode", "Nav deceleration mode",
+   "What to slow down for. 0: off  1: speed cameras  2: + speed bumps  3: + mobile cameras", 0, 3, 1),
+  ("AutoNaviSpeedSafetyFactor", "Camera limit factor (%)",
+   "Slow to the camera limit x this percent (e.g. 105 = 5% over the posted limit).", 80, 120, 1),
+  ("AutoNaviSpeedDecelRate", "Camera decel rate (x0.01 m/s2)",
+   "Deceleration strength toward a camera. Lower = gentler and starts braking from farther away.", 50, 300, 10),
+  ("AutoNaviSpeedCtrlEnd", "Camera finish margin (s)",
+   "Reach the camera limit this many seconds before the camera.", 3, 20, 1),
+  ("AutoNaviSpeedBumpSpeed", "Speed bump pass speed (km/h)",
+   "Target speed to pass over a speed bump.", 10, 100, 5),
+  ("AutoNaviSpeedBumpTime", "Bump finish margin (s)",
+   "Reach the bump pass speed this many seconds before the bump.", 1, 50, 1),
+  ("AutoNaviCountDownMode", "Nav alert countdown",
+   "0: none  1: turn point + speed  2: turn point + speed + bumps", 0, 2, 1),
+  ("AutoRoadSpeedLimitOffset", "Road limit offset",
+   "Road speed limit + this value. -1 disables.", -1, 100, 1),
 ]
 
-# Description constants
+# Description constants (English)
 DESCRIPTIONS = {
   "DisableDM": tr_noop(
-    "경고: 운전자 감시(주의 경고·강제감속)를 끕니다. 당근 DisableDM 방식 그대로 — DM "
-    "모델/데몬을 아예 실행하지 않고 DM 이벤트를 억제합니다. 디바이스 전역 설정이라 특정 "
-    "차종만 가릴 수 없습니다. 차량 통제 책임은 항상 운전자에게 있습니다. 재부팅 후 적용. "
-    "본인 책임 하에 사용하세요."
+    "WARNING: turns off driver monitoring (attention alerts and forced slowdown). Same as "
+    "carrot's DisableDM - the DM model/daemon is not run and DM events are suppressed. This is "
+    "a device-wide setting and cannot be limited to one car. You are always responsible for "
+    "controlling the vehicle. Applied after reboot. Use at your own risk."
   ),
   "AutoGasSyncSpeed": tr_noop(
-    "VW MEB 전용: 가속 페달을 밟아(약 0.4초 이상 유지) 속도가 설정속도보다 빨라지면, "
-    "설정속도를 현재 속도로 자동 동기화합니다. openpilot 롱컨(예: DEC 켜짐)에서만 작동하며, "
-    "순정 ACC에서는 무효입니다."
+    "VW MEB only: if you press the accelerator (held ~0.4s+) and go faster than the set speed, "
+    "the set speed auto-syncs up to your current speed. Works only with openpilot longitudinal "
+    "(e.g. DEC on); has no effect on stock ACC."
   ),
   "EnableStalkBigStep": tr_noop(
-    "VW MEB 전용: 크루즈 스토크 2단(GRA_Tip_Stufe_2)으로 설정속도를 크게(5단위) 조절합니다. "
-    "openpilot 롱컨(예: DEC 켜짐) 필요. ※현재는 opendbc 미반영으로 동작하지 않습니다(켜도 무해)."
+    "VW MEB only: push the cruise stalk to the 2nd detent (GRA_Tip_Stufe_2) to change the set "
+    "speed by a big step - the same amount as a long press (default x5, or your Custom ACC "
+    "long-press increment). Requires openpilot longitudinal (e.g. DEC on)."
   ),
   "EnableWebTerminal": tr_noop(
-    "경고: 6999 포트에 carrot 복구 웹 터미널을 띄웁니다(주행/주차 모두 실행). 브라우저로 "
-    "http://<디바이스IP>:6999 접속 시 터미널 + git 복구 UI를 사용할 수 있습니다. 같은 "
-    "네트워크의 누구나 인증 없이 root 셸에 접근할 수 있으니 신뢰된 네트워크에서만 켜세요. 재부팅 후 적용."
+    "WARNING: starts the carrot recovery web terminal on port 6999 (runs while driving and "
+    "parked). Browse to http://<device-ip>:6999 for a terminal + git recovery UI. Anyone on the "
+    "same network gets an unauthenticated root shell, so only enable on trusted networks. "
+    "Applied after reboot."
   ),
   "Mads": tr_noop(
-    "MADS(상시 조향) 바로가기: 크루즈와 무관하게 조향(횡방향)을 유지합니다. "
-    "Steering > MADS와 동일한 설정입니다."
+    "MADS (always-on steering) shortcut: keeps lateral/steering engaged independent of cruise. "
+    "Same setting as Steering > MADS."
   ),
   "DynamicExperimentalControl": tr_noop(
-    "DEC(동적 실험 롱컨) 바로가기: 상황에 따라 일반/실험 롱컨을 자동으로 전환합니다. "
-    "Cruise > DEC와 동일한 설정. 가스싱크·빅스텝을 쓰려면 이 항목을 켜야 합니다."
+    "DEC (Dynamic Experimental Control) shortcut: auto-switches between ACC and experimental "
+    "longitudinal by situation. Same as Cruise > DEC. Gas-sync and big-step need this on."
   ),
   "EnableTmapSpeedLimit": tr_noop(
-    "T맵/카카오내비 폰 내비를 제한속도·과속카메라 소스로 사용합니다(carrot SDI, UDP :7706). "
-    "켜면 속도제한 제어가 켜지고 정책이 map-data로 설정되며, OSM 지도 다운로드는 꺼집니다. "
-    "폰 앱이 디바이스로 데이터를 브로드캐스트해야 작동합니다. 재부팅 후 적용."
+    "Use the T map / KakaoNavi phone nav as a speed-limit and speed-camera source (carrot SDI, "
+    "HTTP :7713 / UDP :7706). Enabling turns on speed-limit control, routes it to map data and "
+    "disables OSM map download. The phone app must broadcast data to the device. Applied after "
+    "reboot."
   ),
 }
 
@@ -88,37 +93,37 @@ class TjddydLayout(Widget):
     # param, title, desc, icon
     self._toggle_defs = {
       "DisableDM": (
-        lambda: tr("운전자 감시 끄기 (본인 책임)"),
+        lambda: tr("Driver monitoring OFF (own risk)"),
         DESCRIPTIONS["DisableDM"],
         "chffr_wheel.png",
       ),
       "AutoGasSyncSpeed": (
-        lambda: tr("VW MEB: 가스 싱크 (설정속도 자동맞춤)"),
+        lambda: tr("VW MEB: Gas sync (auto set speed)"),
         DESCRIPTIONS["AutoGasSyncSpeed"],
         "speed_limit.png",
       ),
       "EnableStalkBigStep": (
-        lambda: tr("VW MEB: 스토크 빅스텝 (2단)"),
+        lambda: tr("VW MEB: Stalk big step (2nd detent)"),
         DESCRIPTIONS["EnableStalkBigStep"],
         "speed_limit.png",
       ),
       "EnableWebTerminal": (
-        lambda: tr("웹 터미널 :6999 (본인 책임)"),
+        lambda: tr("Web terminal :6999 (own risk)"),
         DESCRIPTIONS["EnableWebTerminal"],
         "chffr_wheel.png",
       ),
       "Mads": (
-        lambda: tr("MADS - 상시 조향 (바로가기)"),
+        lambda: tr("MADS - always-on steering (shortcut)"),
         DESCRIPTIONS["Mads"],
         "chffr_wheel.png",
       ),
       "DynamicExperimentalControl": (
-        lambda: tr("DEC - 동적 실험 롱컨 (바로가기)"),
+        lambda: tr("DEC - dynamic experimental long (shortcut)"),
         DESCRIPTIONS["DynamicExperimentalControl"],
         "speed_limit.png",
       ),
       "EnableTmapSpeedLimit": (
-        lambda: tr("T맵/카카오내비 제한속도 (:7706)"),
+        lambda: tr("T map / KakaoNavi speed limit (:7713)"),
         DESCRIPTIONS["EnableTmapSpeedLimit"],
         "speed_limit.png",
       ),
@@ -137,10 +142,10 @@ class TjddydLayout(Widget):
       self._toggles[param] = toggle
 
     # Live TMAP connection status row (updated ~2x/sec from the TmapStatus param)
-    self._tmap_status_text = tr("꺼짐 (토글 OFF)")
+    self._tmap_status_text = tr("Off (toggle disabled)")
     self._status_counter = 0
     self._tmap_status_item = text_item(
-      lambda: tr("티맵 연결 상태"),
+      lambda: tr("T map connection"),
       lambda: self._tmap_status_text,
     )
 
@@ -168,14 +173,17 @@ class TjddydLayout(Widget):
     self._status_counter += 1
     if self._status_counter % 30 == 0:
       if not self._params.get_bool("EnableTmapSpeedLimit"):
-        self._tmap_status_text = tr("꺼짐 (토글 OFF)")
+        self._tmap_status_text = tr("Off (toggle disabled)")
       else:
         s = self._params.get("TmapStatus")
-        self._tmap_status_text = s if s else tr("대기 중 · 폰 데이터 없음")
+        self._tmap_status_text = s if s else tr("Waiting - no phone data")
 
   def show_event(self):
     super().show_event()
     self._scroller.show_event()
+    # Always show the description under each item so it explains what the feature does.
+    for toggle in self._toggles.values():
+      toggle.show_description(True)
     for opt in getattr(self, "_option_items", []):
       opt.show_description(True)
     self._update_toggles()
