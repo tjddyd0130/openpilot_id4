@@ -7,6 +7,7 @@ See the LICENSE.md file in the root directory for more details.
 import pyray as rl
 
 from openpilot.common.constants import CV
+from openpilot.common.params import Params
 from openpilot.selfdrive.ui.mici.onroad.torque_bar import TorqueBar
 from openpilot.selfdrive.ui.sunnypilot.onroad.blind_spot_indicators import BlindSpotIndicators
 from openpilot.selfdrive.ui.sunnypilot.onroad.developer_ui import DeveloperUiRenderer, DeveloperUiState, get_bottom_dev_ui_offset
@@ -40,6 +41,12 @@ class HudRendererSP(HudRenderer):
     self.blind_spot_indicators = BlindSpotIndicators()
     self._torque_bar = TorqueBar(scale=3.0, always=True)
 
+    # tjddyd: small TMAP logo shown under the set-speed box while the phone nav is connected
+    self._tmap_logo = gui_app.texture("../../sunnypilot/selfdrive/assets/tmap_logo.png", 52, 52)
+    self._tmap_params = Params()
+    self._tmap_connected: bool = False
+    self._tmap_check_counter: int = 0
+
     self.pcm_cruise_speed: bool = True
     self.show_icbm_status: bool = False
     self.icbm_active_counter: int = 0
@@ -54,6 +61,16 @@ class HudRendererSP(HudRenderer):
       self.pcm_cruise_speed = ui_state.CP_SP.pcmCruiseSpeed
     self.speed_conv = CV.MS_TO_KPH if ui_state.is_metric else CV.MS_TO_MPH
     self.speed_cluster = ui_state.sm['carState'].cruiseState.speedCluster * self.speed_conv
+
+    # TMAP connection state (throttled param read ~2x/sec): connected iff the toggle is on
+    # and mapd reports fresh phone data (TmapStatus starts with "Connected").
+    self._tmap_check_counter += 1
+    if self._tmap_check_counter % 30 == 0:
+      if not self._tmap_params.get_bool("EnableTmapSpeedLimit"):
+        self._tmap_connected = False
+      else:
+        s = self._tmap_params.get("TmapStatus")
+        self._tmap_connected = bool(s) and s.startswith("Connected")
 
     super()._update_state()
     self.road_name_renderer.update()
@@ -135,6 +152,15 @@ class HudRendererSP(HudRenderer):
     super()._render(rect)
 
     self.blind_spot_indicators.render(rect)
+
+    # tjddyd: TMAP connected -> small logo centered just below the set-speed box
+    if self._tmap_connected:
+      sw = UI_CONFIG.set_speed_width_metric if ui_state.is_metric else UI_CONFIG.set_speed_width_imperial
+      bx = rect.x + 60 + (UI_CONFIG.set_speed_width_imperial - sw) // 2
+      by = rect.y + 45
+      lx = bx + (sw - self._tmap_logo.width) / 2
+      ly = by + UI_CONFIG.set_speed_height + 14
+      rl.draw_texture_ex(self._tmap_logo, rl.Vector2(lx, ly), 0.0, 1.0, rl.WHITE)
 
     if ui_state.torque_bar:
       torque_rect = rect
