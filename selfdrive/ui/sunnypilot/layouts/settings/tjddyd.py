@@ -42,6 +42,12 @@ TMAP_OPTIONS = [
    "0: none  1: turn point + speed  2: turn point + speed + bumps", 0, 2, 1),
   ("AutoRoadSpeedLimitOffset", "Road limit offset",
    "Road speed limit + this value. -1 disables.", -1, 100, 1),
+  ("AutoTurnControl", "Turn / intersection slowdown",
+   "Slow down before turns from nav guidance (TBT). 0: off  1: on", 0, 1, 1),
+  ("AutoTurnControlSpeedTurn", "Turn pass speed (km/h)",
+   "Target speed through an actual left/right/u-turn.", 10, 60, 5),
+  ("AutoTurnControlTurnEnd", "Turn finish margin (s)",
+   "Reach the turn speed this many seconds before the turn.", 1, 20, 1),
 ]
 
 # Description constants (English)

@@ -446,6 +446,8 @@ struct LiveMapDataSP @0xf416ec09499d9d19 {
   speedLimitAheadDistance @4 :Float32;
   roadName @5 :Text;
   speedLimitAheadIsBump @6 :Bool;  # tjddyd: the upcoming event is a speed bump (not a camera)
+  turnSpeedLimitAhead @7 :Float32;  # tjddyd: target speed for an upcoming turn/intersection (m/s, 0 = none)
+  turnSpeedLimitAheadDistance @8 :Float32;  # tjddyd: distance to that turn (m)
 }
 
 struct ModelDataV2SP @0xa1680744031fdb2d {

@@ -67,6 +67,7 @@ class SpeedLimitResolver:
     self.tmap_decel_rate = 1.2   # m/s^2 (AutoNaviSpeedDecelRate * 0.01)
     self.tmap_ctrl_end = 7.0     # s, finish decel this many seconds before a camera
     self.tmap_bump_time = 1.0    # s, finish decel this many seconds before a speed bump
+    self.tmap_turn_end = 6.0     # s, finish decel this many seconds before a turn
     self.tmap_ahead_is_bump = False
 
     self.is_metric = self.params.get_bool("IsMetric")
@@ -110,6 +111,7 @@ class SpeedLimitResolver:
         self.tmap_decel_rate = max(0.1, self.params.get("AutoNaviSpeedDecelRate", return_default=True) * 0.01)
         self.tmap_ctrl_end = float(self.params.get("AutoNaviSpeedCtrlEnd", return_default=True))
         self.tmap_bump_time = float(self.params.get("AutoNaviSpeedBumpTime", return_default=True))
+        self.tmap_turn_end = float(self.params.get("AutoTurnControlTurnEnd", return_default=True))
 
   def _get_speed_limit_offset(self) -> float:
     if self.offset_type == OffsetType.off:

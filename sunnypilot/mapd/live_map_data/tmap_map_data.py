@@ -39,6 +39,12 @@ SIOCGIFBRDADDR = 0x8919     # get interface broadcast address
 # carrot nSdiType values that carry a speed limit / fixed camera
 SDI_LIMIT_TYPES = (0, 1, 2, 3, 4, 7, 8, 75, 76)
 
+# carrot nTBTTurnType codes that warrant slowing down (turns/uturn). Forks (6,7) and rotary
+# (131) slow to the road limit; sharp turns (16,19) like normal turns. Others (e.g. 121
+# straight, 201 arrive) are not slowdowns.
+TURN_TYPES_TURN = (12, 16, 13, 19, 14)      # left / sharp-left / right / sharp-right / uturn
+TURN_TYPES_ROAD = (6, 7, 131)               # forks / rotary -> hold the road limit
+
 
 class _NaviHandler(BaseHTTPRequestHandler):
   # The modern T map / KakaoNavi phone app POSTs route guidance to /api/navi/<version>
@@ -96,6 +102,8 @@ class TmapMapData(BaseMapData):
     self.xSpdDist = 0
     self.xSpdType = -1
     self.roadName = ""
+    self.xTurnSpeed = 0      # kph, target speed for an upcoming turn (0 = none)
+    self.xTurnDist = 0       # m, distance to that turn
     self._nRoadLimitSpeed_counter = 0
     self._remote_ip = ""
     self._last_dump = 0.0
@@ -104,6 +112,8 @@ class TmapMapData(BaseMapData):
     self.autoNaviSpeedSafetyFactor = 1.05
     self.autoNaviSpeedCtrlMode = 2
     self.autoNaviSpeedBumpSpeed = 35.0
+    self.autoTurnControl = 0          # 0 = off
+    self.autoTurnControlSpeedTurn = 20  # kph, target speed through a turn
 
     threading.Thread(target=self._udp_thread, daemon=True).start()
     threading.Thread(target=self._broadcast_thread, daemon=True).start()
@@ -168,6 +178,8 @@ class TmapMapData(BaseMapData):
     self.autoNaviSpeedSafetyFactor = float(self.params.get("AutoNaviSpeedSafetyFactor", return_default=True)) * 0.01
     self.autoNaviSpeedCtrlMode = self.params.get("AutoNaviSpeedCtrlMode", return_default=True)
     self.autoNaviSpeedBumpSpeed = float(self.params.get("AutoNaviSpeedBumpSpeed", return_default=True))
+    self.autoTurnControl = self.params.get("AutoTurnControl", return_default=True)
+    self.autoTurnControlSpeedTurn = float(self.params.get("AutoTurnControlSpeedTurn", return_default=True))
 
   def _udp_thread(self) -> None:
     while True:
@@ -229,6 +241,9 @@ class TmapMapData(BaseMapData):
     if road_name == "null":
       road_name = ""
 
+    nTBTTurnType = _i(j.get("nTBTTurnType"), -1)
+    nTBTDist = _i(j.get("nTBTDist"), 0)
+
     with self._lock:
       # debounce road-limit changes (carrot: needs >5 stable updates)
       if self.nRoadLimitSpeed != nrl:
@@ -260,6 +275,22 @@ class TmapMapData(BaseMapData):
         self.xSpdType = -1
         self.xSpdDist = 0
 
+      # carrot update_auto_turn: slow down for an upcoming turn/intersection (TBT).
+      # Actual turns use the configured turn speed; forks/rotary hold the road limit.
+      if self.autoTurnControl > 0 and nTBTDist > 0 and self.nRoadLimitSpeed > 0:
+        if nTBTTurnType in TURN_TYPES_TURN:
+          self.xTurnSpeed = self.autoTurnControlSpeedTurn
+          self.xTurnDist = nTBTDist
+        elif nTBTTurnType in TURN_TYPES_ROAD:
+          self.xTurnSpeed = float(self.nRoadLimitSpeed)
+          self.xTurnDist = nTBTDist
+        else:
+          self.xTurnSpeed = 0
+          self.xTurnDist = 0
+      else:
+        self.xTurnSpeed = 0
+        self.xTurnDist = 0
+
       self._last_rx = time.monotonic()
 
   def _fresh(self) -> bool:
@@ -282,6 +313,12 @@ class TmapMapData(BaseMapData):
         return 0.0, 0.0
       return float(self.xSpdLimit) * CV.KPH_TO_MS, float(max(self.xSpdDist, 0))
 
+  def get_turn_speed_and_distance(self) -> tuple[float, float]:
+    with self._lock:
+      if not self._fresh() or self.xTurnSpeed <= 0:
+        return 0.0, 0.0
+      return float(self.xTurnSpeed) * CV.KPH_TO_MS, float(max(self.xTurnDist, 0))
+
   def get_current_road_name(self) -> str:
     with self._lock:
       return self.roadName if self._fresh() else ""
@@ -290,6 +327,7 @@ class TmapMapData(BaseMapData):
     # Override BaseMapData.publish: validity follows fresh UDP data, not local GPS.
     speed_limit = self.get_current_speed_limit()
     next_speed_limit, next_speed_limit_distance = self.get_next_speed_limit_and_distance()
+    turn_speed, turn_distance = self.get_turn_speed_and_distance()
 
     mapd_sp_send = messaging.new_message('liveMapDataSP')
     mapd_sp_send.valid = self._fresh()
@@ -300,6 +338,8 @@ class TmapMapData(BaseMapData):
     live_map_data.speedLimitAhead = next_speed_limit
     live_map_data.speedLimitAheadDistance = next_speed_limit_distance
     live_map_data.speedLimitAheadIsBump = bool(next_speed_limit > 0 and self.xSpdType == 22)
+    live_map_data.turnSpeedLimitAhead = turn_speed
+    live_map_data.turnSpeedLimitAheadDistance = turn_distance
     live_map_data.roadName = self.get_current_road_name()
     self.pm.send('liveMapDataSP', mapd_sp_send)
 
