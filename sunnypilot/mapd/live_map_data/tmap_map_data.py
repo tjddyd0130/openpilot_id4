@@ -261,9 +261,15 @@ class TmapMapData(BaseMapData):
         self.xSpdLimit = nSdiSpeedLimit * self.autoNaviSpeedSafetyFactor
         self.xSpdDist = nSdiDist
         self.xSpdType = nSdiType
-        if nSdiBlockType in (2, 3):
-          self.xSpdDist = nSdiBlockDist
+        if nSdiBlockType in (2, 3):  # average-speed section (구간단속)
           self.xSpdType = 4
+          if nSdiDist > 0:
+            self.xSpdDist = nSdiDist          # still approaching the section start -> decel to it
+          else:
+            # inside the section: hold the posted limit the whole way through (average-speed
+            # enforcement). No safety-factor over-speed so the average stays under the limit.
+            self.xSpdLimit = float(nSdiSpeedLimit)
+            self.xSpdDist = 0
         elif nSdiType == 7 and self.autoNaviSpeedCtrlMode < 3:  # mobile camera
           self.xSpdLimit = self.xSpdDist = 0
       elif (nSdiPlusType == 22 or nSdiType == 22) and roadcate > 1 and self.autoNaviSpeedCtrlMode >= 2:  # speed bump
