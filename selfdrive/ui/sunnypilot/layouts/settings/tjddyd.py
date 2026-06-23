@@ -93,6 +93,16 @@ DESCRIPTIONS = {
     "(from the car's side-assist radar). Display only - it does NOT slow the car down (unlike the "
     "factory side assist). Needs the car's blind-spot CAN (MEB_Side_Assist_01) to still be active."
   ),
+  "MebLowSpeedCloseFollow": tr_noop(
+    "VW MEB only: follow the lead a bit closer at LOW speed (stop-and-go under 30 km/h). Only the "
+    "moving time-gap is tightened and it blends back to stock by 30 km/h; the 6 m standstill "
+    "stopping distance behind a stopped car is NOT changed. Set the strength below. Requires "
+    "openpilot longitudinal (e.g. DEC on); no effect on stock ACC. Test carefully, start near 100%."
+  ),
+  "MebLowSpeedFollowPercent": tr_noop(
+    "Low-speed follow gap as a percent of stock (100 = stock, lower = closer below 30 km/h). "
+    "Only used when the low-speed close-follow toggle above is on."
+  ),
 }
 
 
@@ -143,6 +153,11 @@ class TjddydLayout(Widget):
         DESCRIPTIONS["BlindSpot"],
         "chffr_wheel.png",
       ),
+      "MebLowSpeedCloseFollow": (
+        lambda: tr("VW MEB: Low-speed close follow (<30 km/h)"),
+        DESCRIPTIONS["MebLowSpeedCloseFollow"],
+        "speed_limit.png",
+      ),
     }
 
     self._toggles = {}
@@ -181,6 +196,19 @@ class TjddydLayout(Widget):
       )
       self._option_items.append(opt)
       items.append(opt)
+
+    # Low-speed close-follow strength, gated to its own toggle (not TMAP)
+    follow_opt = option_item_sp(
+      title=(lambda: tr("Low-speed follow gap (% of stock)")),
+      param="MebLowSpeedFollowPercent",
+      min_value=50,
+      max_value=100,
+      description=(lambda: tr(DESCRIPTIONS["MebLowSpeedFollowPercent"])),
+      value_change_step=5,
+      enabled=lambda: ui_state.params.get_bool("MebLowSpeedCloseFollow"),
+    )
+    self._option_items.append(follow_opt)
+    items.append(follow_opt)
 
     self._scroller = Scroller(items, line_separator=True, spacing=0)
 

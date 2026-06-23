@@ -14,6 +14,8 @@ from openpilot.selfdrive.controls.lib.longitudinal_mpc_lib.long_mpc import T_IDX
 from openpilot.selfdrive.controls.lib.drive_helpers import CONTROL_N, get_accel_from_plan, get_speed_from_plan
 from openpilot.selfdrive.car.cruise import V_CRUISE_MAX, V_CRUISE_UNSET
 from openpilot.common.swaglog import cloudlog
+from openpilot.common.params import Params
+from opendbc.car.volkswagen.values import VolkswagenFlags
 
 from openpilot.sunnypilot.selfdrive.controls.lib.longitudinal_planner import LongitudinalPlannerSP
 
@@ -76,6 +78,20 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
     self.a_desired_trajectory = np.zeros(CONTROL_N)
     self.j_desired_trajectory = np.zeros(CONTROL_N)
 
+    # tjddyd VW MEB opt-in: low-speed close-follow. Gated to VW MEB and to the toggle being on.
+    self.params = Params()
+    self._frame = 0
+    self.is_meb = self.CP.brand == "volkswagen" and bool(self.CP.flags & VolkswagenFlags.MEB)
+    self._update_low_speed_follow()
+
+  def _update_low_speed_follow(self):
+    # Only MEB + opt-in toggle scales t_follow; otherwise factor stays 1.0 (stock, no effect).
+    factor = 1.0
+    if self.is_meb and self.params.get_bool("MebLowSpeedCloseFollow"):
+      pct = self.params.get("MebLowSpeedFollowPercent", return_default=True)
+      factor = min(max(int(pct), 50), 100) / 100.0
+    self.mpc.low_speed_tfollow_factor = factor
+
   @staticmethod
   def parse_model(model_msg):
     if (len(model_msg.position.x) == ModelConstants.IDX_N and
@@ -98,6 +114,11 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
 
   def update(self, sm):
     LongitudinalPlannerSP.update(self, sm)
+
+    # tjddyd: refresh the low-speed close-follow factor ~every 5 s (cheap, MEB-gated)
+    self._frame += 1
+    if self._frame % 100 == 0:
+      self._update_low_speed_follow()
 
     if len(sm['carControl'].orientationNED) == 3:
       accel_coast = get_coast_accel(sm['carControl'].orientationNED[1])
