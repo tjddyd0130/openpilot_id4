@@ -86,11 +86,11 @@ class LongitudinalPlannerSP:
         end_s = self.resolver.tmap_bump_time if self.resolver.tmap_ahead_is_bump else self.resolver.tmap_ctrl_end
         dd = max(0., self.resolver.distance - v_limit * end_s)
         tmap_target = min(tmap_target, max(v_limit, (v_limit ** 2 + 2.0 * self.resolver.tmap_decel_rate * dd) ** 0.5))
-      # turn / intersection (separate TBT channel, so it never shows as a speed-limit sign)
-      lmd = sm['liveMapDataSP']
-      if lmd.turnSpeedLimitAhead > 0.:
-        v_turn = lmd.turnSpeedLimitAhead
-        dd = max(0., lmd.turnSpeedLimitAheadDistance - v_turn * self.resolver.tmap_turn_end)
+      # turn / intersection (separate TBT channel, so it never shows as a speed-limit sign).
+      # Uses the resolver's odometry-smoothed turn speed/distance.
+      if self.resolver.tmap_turn_speed > 0.:
+        v_turn = self.resolver.tmap_turn_speed
+        dd = max(0., self.resolver.tmap_turn_dist - v_turn * self.resolver.tmap_turn_end)
         tmap_target = min(tmap_target, max(v_turn, (v_turn ** 2 + 2.0 * self.resolver.tmap_decel_rate * dd) ** 0.5))
       targets[LongitudinalPlanSource.speedLimitAssist] = (tmap_target, a_ego)
 

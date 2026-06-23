@@ -69,6 +69,12 @@ class SpeedLimitResolver:
     self.tmap_bump_time = 1.0    # s, finish decel this many seconds before a speed bump
     self.tmap_turn_end = 6.0     # s, finish decel this many seconds before a turn
     self.tmap_ahead_is_bump = False
+    # carrot-style odometry smoothing: TMAP sends distances ~1Hz; fill in between updates with
+    # v_ego*dt so the deceleration distance counts down smoothly at the planner rate.
+    self._tmap_smooth_dist = 0.0
+    self._tmap_turn_smooth_dist = 0.0
+    self.tmap_turn_speed = 0.0
+    self.tmap_turn_dist = 0.0
 
     self.is_metric = self.params.get_bool("IsMetric")
     self.offset_type = get_sanitize_int_param(
@@ -146,7 +152,18 @@ class SpeedLimitResolver:
     # it directly and skip the GPS-fix aging (no GPS dependency, no monotonic/epoch mix).
     if self.use_tmap:
       self.tmap_ahead_is_bump = bool(getattr(map_data, "speedLimitAheadIsBump", False))
-      self._calculate_map_data_limits_tmap(speed_limit, next_speed_limit, map_data.speedLimitAheadDistance)
+      # On a fresh TMAP message reset to its distance; between updates decrement by our own
+      # odometry (v_ego*dt) so camera/section/turn distances are smooth instead of 1Hz steppy.
+      fresh = sm.updated['liveMapDataSP']
+      if fresh:
+        self._tmap_smooth_dist = map_data.speedLimitAheadDistance
+        self._tmap_turn_smooth_dist = getattr(map_data, "turnSpeedLimitAheadDistance", 0.0)
+      else:
+        self._tmap_smooth_dist = max(0.0, self._tmap_smooth_dist - self.v_ego * DT_MDL)
+        self._tmap_turn_smooth_dist = max(0.0, self._tmap_turn_smooth_dist - self.v_ego * DT_MDL)
+      self.tmap_turn_speed = getattr(map_data, "turnSpeedLimitAhead", 0.0)
+      self.tmap_turn_dist = self._tmap_turn_smooth_dist
+      self._calculate_map_data_limits_tmap(speed_limit, next_speed_limit, self._tmap_smooth_dist)
       return
 
     gps_data = sm[self._gps_location_service]
