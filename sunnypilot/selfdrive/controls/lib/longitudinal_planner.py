@@ -115,7 +115,10 @@ class LongitudinalPlannerSP:
     end_s = self.resolver.tmap_bump_time if self.resolver.tmap_ahead_is_bump else self.resolver.tmap_ctrl_end
     decel_dist = max(1.0, self.resolver.distance - v_limit * end_s)
     a_carrot = (v_limit ** 2 - v_ego ** 2) / (2.0 * decel_dist)
-    a_carrot = max(a_carrot, TMAP_DECEL_ACCEL_FLOOR)
+    # Don't brake harder than the configured decel rate, so the slowdown is smooth and the
+    # AutoNaviSpeedDecelRate setting actually controls firmness (a close camera no longer slams
+    # to the comfort floor). TMAP_DECEL_ACCEL_FLOOR is just an absolute safety bound.
+    a_carrot = max(a_carrot, -self.resolver.tmap_decel_rate, TMAP_DECEL_ACCEL_FLOOR)
     return min(a_target, a_carrot)
 
   def update(self, sm: messaging.SubMaster) -> None:
