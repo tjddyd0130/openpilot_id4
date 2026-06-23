@@ -20,6 +20,8 @@ from openpilot.sunnypilot.models.helpers import get_active_bundle
 DecState = custom.LongitudinalPlanSP.DynamicExperimentalControl.DynamicExperimentalControlState
 LongitudinalPlanSource = custom.LongitudinalPlanSP.LongitudinalPlanSource
 
+TMAP_DECEL_ACCEL_FLOOR = -2.5  # m/s^2, comfort floor for carrot-curve TMAP camera/bump deceleration
+
 
 class LongitudinalPlannerSP:
   def __init__(self, CP: structs.CarParams, CP_SP: structs.CarParamsSP, mpc):
@@ -86,6 +88,26 @@ class LongitudinalPlannerSP:
     self.source = min(targets, key=lambda k: targets[k][0])
     self.output_v_target, self.output_a_target = targets[self.source]
     return self.output_v_target, self.output_a_target
+
+  def tmap_decel_accel(self, v_ego: float, a_target: float) -> float:
+    # tjddyd option 2: when a TMAP camera/bump is ahead, also command the carrot curve's
+    # implied deceleration so if2's MPC follows it tightly -- the v_target cap alone is chased
+    # too gently, which felt imprecise at the camera. a_carrot is the constant decel needed to
+    # reach the limit at the carrot margin point; it self-eases to 0 as v_ego -> the limit and
+    # steepens if we are behind the curve. We take the min with the MPC accel so a closer lead
+    # can still brake harder, and clip to a comfort floor. Gated on use_tmap (base unaffected).
+    if not (self.resolver.use_tmap and self.resolver.speed_limit > 0.):
+      return a_target
+
+    v_limit = self.resolver.speed_limit_final
+    if v_ego <= v_limit + 0.1:
+      return a_target
+
+    end_s = self.resolver.tmap_bump_time if self.resolver.tmap_ahead_is_bump else self.resolver.tmap_ctrl_end
+    decel_dist = max(1.0, self.resolver.distance - v_limit * end_s)
+    a_carrot = (v_limit ** 2 - v_ego ** 2) / (2.0 * decel_dist)
+    a_carrot = max(a_carrot, TMAP_DECEL_ACCEL_FLOOR)
+    return min(a_target, a_carrot)
 
   def update(self, sm: messaging.SubMaster) -> None:
     self.events_sp.clear()
