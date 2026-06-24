@@ -38,6 +38,11 @@ class LongitudinalPlannerSP:
     self.output_v_target = 0.
     self.output_a_target = 0.
 
+    # tjddyd: speed the driver reached by pressing the gas while we were slowing for a speed
+    # bump. Once captured it becomes the bump pass speed for the rest of that bump event, so we
+    # don't yank them back down after they release the pedal. Resets when the bump clears.
+    self._bump_override_speed = 0.
+
   def is_e2e(self, sm: messaging.SubMaster) -> bool:
     experimental_mode = sm['selfdriveState'].experimentalMode
     if not self.dec.active():
@@ -81,11 +86,26 @@ class LongitudinalPlannerSP:
     if self.resolver.use_tmap:
       tmap_target = self.sla.output_v_target  # base: no tmap event -> assist's own (unset)
       # camera / section / bump (sign-bearing event)
+      bump_active = self.resolver.speed_limit > 0. and self.resolver.tmap_ahead_is_bump
+      # bump override-adopt: if the driver presses the gas while we slow for a bump, capture the
+      # speed they reach and hold it as the bump pass speed (only rises) so there is no yank-down
+      # after they lift off. Cameras are enforcement, so this is bump-only. Clears with the event.
+      if bump_active:
+        if long_override:
+          self._bump_override_speed = max(self._bump_override_speed, v_ego)
+      else:
+        self._bump_override_speed = 0.
       if self.resolver.speed_limit > 0.:
-        v_limit = self.resolver.speed_limit_final
-        end_s = self.resolver.tmap_bump_time if self.resolver.tmap_ahead_is_bump else self.resolver.tmap_ctrl_end
+        if bump_active:
+          v_limit = max(self.resolver.speed_limit_final, self._bump_override_speed)
+          end_s = self.resolver.tmap_bump_time
+          decel_rate = self.resolver.tmap_bump_decel_rate
+        else:
+          v_limit = self.resolver.speed_limit_final
+          end_s = self.resolver.tmap_ctrl_end
+          decel_rate = self.resolver.tmap_decel_rate
         dd = max(0., self.resolver.distance - v_limit * end_s)
-        tmap_target = min(tmap_target, max(v_limit, (v_limit ** 2 + 2.0 * self.resolver.tmap_decel_rate * dd) ** 0.5))
+        tmap_target = min(tmap_target, max(v_limit, (v_limit ** 2 + 2.0 * decel_rate * dd) ** 0.5))
       # turn / intersection (separate TBT channel, so it never shows as a speed-limit sign).
       # Uses the resolver's odometry-smoothed turn speed/distance.
       if self.resolver.tmap_turn_speed > 0.:
@@ -108,17 +128,24 @@ class LongitudinalPlannerSP:
     if not (self.resolver.use_tmap and self.resolver.speed_limit > 0.):
       return a_target
 
-    v_limit = self.resolver.speed_limit_final
+    if self.resolver.tmap_ahead_is_bump:
+      v_limit = max(self.resolver.speed_limit_final, self._bump_override_speed)
+      end_s = self.resolver.tmap_bump_time
+      decel_rate = self.resolver.tmap_bump_decel_rate
+    else:
+      v_limit = self.resolver.speed_limit_final
+      end_s = self.resolver.tmap_ctrl_end
+      decel_rate = self.resolver.tmap_decel_rate
+
     if v_ego <= v_limit + 0.1:
       return a_target
 
-    end_s = self.resolver.tmap_bump_time if self.resolver.tmap_ahead_is_bump else self.resolver.tmap_ctrl_end
     decel_dist = max(1.0, self.resolver.distance - v_limit * end_s)
     a_carrot = (v_limit ** 2 - v_ego ** 2) / (2.0 * decel_dist)
     # Don't brake harder than the configured decel rate, so the slowdown is smooth and the
-    # AutoNaviSpeedDecelRate setting actually controls firmness (a close camera no longer slams
-    # to the comfort floor). TMAP_DECEL_ACCEL_FLOOR is just an absolute safety bound.
-    a_carrot = max(a_carrot, -self.resolver.tmap_decel_rate, TMAP_DECEL_ACCEL_FLOOR)
+    # decel-rate setting actually controls firmness (a close event no longer slams to the comfort
+    # floor). Bumps use their own (firmer) rate. TMAP_DECEL_ACCEL_FLOOR is an absolute safety bound.
+    a_carrot = max(a_carrot, -decel_rate, TMAP_DECEL_ACCEL_FLOOR)
     return min(a_target, a_carrot)
 
   def update(self, sm: messaging.SubMaster) -> None:

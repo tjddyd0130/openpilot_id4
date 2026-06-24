@@ -38,6 +38,10 @@ TMAP_OPTIONS = [
    "Target speed to pass over a speed bump.", 10, 100, 5),
   ("AutoNaviSpeedBumpTime", "Bump finish margin (s)",
    "Reach the bump pass speed this many seconds before the bump.", 1, 50, 1),
+  ("AutoNaviSpeedBumpDecelRate", "Bump decel rate (x0.01 m/s2)",
+   "Separate from cameras. Higher = firmer braking that starts LATER / closer to the bump "
+   "(lower = gentler, starts from farther away). Press the gas while it slows for a bump to "
+   "take it at your speed; that speed is then kept until the bump passes.", 50, 350, 10),
   ("AutoNaviCountDownMode", "Nav alert countdown",
    "0: none  1: turn point + speed  2: turn point + speed + bumps", 0, 2, 1),
   ("AutoRoadSpeedLimitOffset", "Road limit offset",

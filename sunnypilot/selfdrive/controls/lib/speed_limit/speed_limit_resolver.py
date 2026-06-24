@@ -65,6 +65,8 @@ class SpeedLimitResolver:
     self.use_tmap = self.params.get_bool("EnableTmapSpeedLimit")
     # carrot AutoNavi deceleration params (used by the planner to shape the decel curve)
     self.tmap_decel_rate = 1.2   # m/s^2 (AutoNaviSpeedDecelRate * 0.01)
+    self.tmap_bump_decel_rate = 2.0  # m/s^2 (AutoNaviSpeedBumpDecelRate * 0.01); firmer than a
+                                     # camera so a bump starts slowing later / closer, not from far
     self.tmap_ctrl_end = 7.0     # s, finish decel this many seconds before a camera
     self.tmap_bump_time = 1.0    # s, finish decel this many seconds before a speed bump
     self.tmap_turn_end = 6.0     # s, finish decel this many seconds before a turn
@@ -115,6 +117,7 @@ class SpeedLimitResolver:
       self.offset_value = self.params.get("SpeedLimitValueOffset", return_default=True)
       if self.use_tmap:
         self.tmap_decel_rate = max(0.1, self.params.get("AutoNaviSpeedDecelRate", return_default=True) * 0.01)
+        self.tmap_bump_decel_rate = max(0.1, self.params.get("AutoNaviSpeedBumpDecelRate", return_default=True) * 0.01)
         self.tmap_ctrl_end = float(self.params.get("AutoNaviSpeedCtrlEnd", return_default=True))
         self.tmap_bump_time = float(self.params.get("AutoNaviSpeedBumpTime", return_default=True))
         self.tmap_turn_end = float(self.params.get("AutoTurnControlTurnEnd", return_default=True))

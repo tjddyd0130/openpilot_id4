@@ -318,6 +318,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"AutoTurnControl", {PERSISTENT | BACKUP, INT, "0"}},
     {"AutoTurnControlSpeedTurn", {PERSISTENT | BACKUP, INT, "20"}},
     {"AutoTurnControlTurnEnd", {PERSISTENT | BACKUP, INT, "6"}},
+    {"AutoNaviSpeedBumpDecelRate", {PERSISTENT | BACKUP, INT, "200"}},
     {"MebLowSpeedCloseFollow", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"MebLowSpeedFollowPercent", {PERSISTENT | BACKUP, INT, "80"}},
 };
