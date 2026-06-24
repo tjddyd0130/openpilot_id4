@@ -377,3 +377,8 @@ class TmapMapData(BaseMapData):
     # Camera speed limit (kph) for the MEB cluster (ACC_Tempolimit): appears at a speed
     # camera and disappears after passing -- mirrors the camera-centric onroad UI.
     self.params.put("TmapRoadLimit", cluster_limit)
+    # tjddyd: turn/curve target speed (kph) for the MEB cluster predictive CURVE event. Non-zero
+    # while the turn controller is slowing for a turn; clears to 0 otherwise. Shown on the dash as
+    # a curve-deceleration event, distinct from the speed-camera sign (carstate injects this into
+    # cruiseState.speedLimitPredicative with type=curve).
+    self.params.put("TmapTurnSpeed", int(round(turn_speed * CV.MS_TO_KPH)) if turn_speed > 0 else 0)

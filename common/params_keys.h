@@ -307,6 +307,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"EnableTmapSpeedLimit", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"TmapStatus", {CLEAR_ON_MANAGER_START, STRING}},
     {"TmapRoadLimit", {CLEAR_ON_MANAGER_START, INT, "0"}},
+    {"TmapTurnSpeed", {CLEAR_ON_MANAGER_START, INT, "0"}},
     {"AutoNaviSpeedCtrlEnd", {PERSISTENT | BACKUP, INT, "7"}},
     {"AutoNaviSpeedCtrlMode", {PERSISTENT | BACKUP, INT, "2"}},
     {"AutoRoadSpeedLimitOffset", {PERSISTENT | BACKUP, INT, "-1"}},

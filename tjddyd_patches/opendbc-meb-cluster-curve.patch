@@ -1,0 +1,97 @@
+From 275bfa68d7e102f9c9e4b4e5b5226272f77fa800 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 24 Jun 2026 23:41:37 +0000
+Subject: [PATCH] VW MEB: show TMAP curve/turn slowdown as the cluster CURVE
+ event
+
+When the openpilot TMAP turn controller slows for a turn, surface it on the
+MEB cluster as the predictive CURVE event (ACC_Events=6) with its target speed,
+so a curve slowdown is shown distinctly from a speed-camera sign.
+
+- carstate: read the TmapTurnSpeed param (kph, written by the openpilot mapd)
+  and inject it into cruiseState.speedLimitPredicative with type=curve, but only
+  when no camera limit is active so the camera sign keeps priority.
+- carcontroller: on MEB, activate the predictive display directly from the
+  injected curve value (there is no stock PSD/CC predictive flag on an EU import),
+  mirroring how the camera sign is driven from cruiseState.speedLimit.
+
+Display-only; never caps speed. Speed bumps are intentionally not shown (no
+dedicated cluster glyph).
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_015XiGYrFo4VxceB8UKz4mPV
+---
+ opendbc/car/volkswagen/carcontroller.py |  7 +++++++
+ opendbc/car/volkswagen/carstate.py      | 17 ++++++++++++++++-
+ 2 files changed, 23 insertions(+), 1 deletion(-)
+
+diff --git a/opendbc/car/volkswagen/carcontroller.py b/opendbc/car/volkswagen/carcontroller.py
+index 1f8729de..28c507b9 100644
+--- a/opendbc/car/volkswagen/carcontroller.py
++++ b/opendbc/car/volkswagen/carcontroller.py
+@@ -8,6 +8,7 @@ from opendbc.car.interfaces import CarControllerBase
+ from opendbc.car.volkswagen import mlbcan, mqbcan, pqcan, mebcan
+ from opendbc.car.volkswagen.values import CanBus, CarControllerParams, VolkswagenFlags
+ from opendbc.car.volkswagen.mebutils import LongControlJerk, LongControlLimit, map_speed_to_acc_tempolimit
++from opendbc.car.volkswagen.speed_limit_manager import PSD_TYPE_CURV_SPEED
+ 
+ from opendbc.sunnypilot.car.volkswagen.icbm import IntelligentCruiseButtonManagementInterface
+ 
+@@ -283,6 +284,12 @@ class CarController(CarControllerBase, IntelligentCruiseButtonManagementInterfac
+                                                         CC.cruiseControl.override or CS.out.gasPressed)
+           
+         sl_predicative_active = True if CC.cruiseControl.speedLimitPredicative and CS.out.cruiseState.speedLimitPredicative != 0 else False
++        # tjddyd: TMAP curve event injected via carstate (MEB) -> activate the predictive CURVE
++        # display directly from the injected value, since there is no stock PSD/CC predictive flag
++        # on an EU import. Mirrors how the camera sign is driven from cruiseState.speedLimit.
++        if (self.CP.flags & VolkswagenFlags.MEB) and CS.out.cruiseState.speedLimitPredicative != 0 \
++           and CS.speed_limit_predicative_type == PSD_TYPE_CURV_SPEED:
++          sl_predicative_active = True
+         if CC.cruiseControl.speedLimit and CS.out.cruiseState.speedLimit != 0 and self.speed_limit_last != CS.out.cruiseState.speedLimit:
+           self.speed_limit_changed_timer = self.frame 
+         self.speed_limit_last = CS.out.cruiseState.speedLimit
+diff --git a/opendbc/car/volkswagen/carstate.py b/opendbc/car/volkswagen/carstate.py
+index 9d228f1b..bf50b2f0 100644
+--- a/opendbc/car/volkswagen/carstate.py
++++ b/opendbc/car/volkswagen/carstate.py
+@@ -6,7 +6,7 @@ from opendbc.car.interfaces import CarStateBase
+ from opendbc.car.common.conversions import Conversions as CV
+ from opendbc.car.volkswagen.values import DBC, CanBus, NetworkLocation, TransmissionType, GearShifter, \
+                                                       CarControllerParams, VolkswagenFlags, RADAR_DISABLE_STATE
+-from opendbc.car.volkswagen.speed_limit_manager import SpeedLimitManager
++from opendbc.car.volkswagen.speed_limit_manager import SpeedLimitManager, PSD_TYPE_CURV_SPEED
+ from opendbc.sunnypilot.car.volkswagen.mads import MadsCarState
+ 
+ # tjddyd: optional openpilot Params, used only to read the TMAP road limit for the MEB
+@@ -40,6 +40,8 @@ class CarState(CarStateBase, MadsCarState):
+     # tjddyd: TMAP road limit (m/s) for the MEB cluster display, refreshed ~2x/sec from a param
+     self._tmap_params = Params() if Params is not None else None
+     self._tmap_cluster_speed_limit = 0.
++    # tjddyd: TMAP turn/curve target speed (m/s) for the cluster predictive CURVE event
++    self._tmap_turn_speed = 0.
+     self.force_rhd_for_bsm = False
+     self.acc_type = 0
+     self.hca_status_last = None
+@@ -406,6 +408,19 @@ class CarState(CarStateBase, MadsCarState):
+       if ret.cruiseState.speedLimit == 0 and self._tmap_cluster_speed_limit > 0:
+         ret.cruiseState.speedLimit = self._tmap_cluster_speed_limit
+ 
++      # tjddyd: TMAP turn/curve slowdown -> drive the cluster's predictive CURVE event
++      # (ACC_Events=6) so a turn is shown distinctly from a speed-camera sign. Only inject when
++      # no camera limit is active, so the camera sign keeps priority and the two never collide.
++      # TmapTurnSpeed (kph) is written by the openpilot mapd while the turn controller is active.
++      if self.frame % 50 == 0:
++        try:
++          self._tmap_turn_speed = int(self._tmap_params.get("TmapTurnSpeed", return_default=True)) * CV.KPH_TO_MS
++        except Exception:
++          self._tmap_turn_speed = 0.
++      if ret.cruiseState.speedLimit == 0 and self._tmap_turn_speed > 0:
++        ret.cruiseState.speedLimitPredicative = self._tmap_turn_speed
++        self.speed_limit_predicative_type = PSD_TYPE_CURV_SPEED
++
+     ret_sp.speedLimit = ret.cruiseState.speedLimit
+     # tjddyd VW MEB opt-in: cruise stalk 2nd detent (big step). 1 = Tip_Stufe_2.
+     ret_sp.graTipStufe2 = bool(pt_cp.vl["GRA_ACC_01"]["GRA_Tip_Stufe_2"])
+-- 
+2.43.0
+
