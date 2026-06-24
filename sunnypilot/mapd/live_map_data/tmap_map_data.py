@@ -104,6 +104,9 @@ class TmapMapData(BaseMapData):
     self.roadName = ""
     self.xTurnSpeed = 0      # kph, target speed for an upcoming turn (0 = none)
     self.xTurnDist = 0       # m, distance to that turn
+    # last raw TBT values seen, surfaced in the status row to debug turn control
+    self._dbg_tbt_type = -1
+    self._dbg_tbt_dist = 0
     self._nRoadLimitSpeed_counter = 0
     self._remote_ip = ""
     self._last_dump = 0.0
@@ -243,6 +246,8 @@ class TmapMapData(BaseMapData):
 
     nTBTTurnType = _i(j.get("nTBTTurnType"), -1)
     nTBTDist = _i(j.get("nTBTDist"), 0)
+    self._dbg_tbt_type = nTBTTurnType
+    self._dbg_tbt_dist = nTBTDist
 
     with self._lock:
       # debounce road-limit changes (carrot: needs >5 stable updates)
@@ -283,11 +288,15 @@ class TmapMapData(BaseMapData):
 
       # carrot update_auto_turn: slow down for an upcoming turn/intersection (TBT).
       # Actual turns use the configured turn speed; forks/rotary hold the road limit.
-      if self.autoTurnControl > 0 and nTBTDist > 0 and self.nRoadLimitSpeed > 0:
+      if self.autoTurnControl > 0 and nTBTDist > 0:
         if nTBTTurnType in TURN_TYPES_TURN:
+          # actual left/right/u-turn: use the configured turn speed. This does NOT depend on the
+          # posted road limit, so don't gate it on nRoadLimitSpeed (that gate blocked turns on
+          # roads where TMAP sends no limit).
           self.xTurnSpeed = self.autoTurnControlSpeedTurn
           self.xTurnDist = nTBTDist
-        elif nTBTTurnType in TURN_TYPES_ROAD:
+        elif nTBTTurnType in TURN_TYPES_ROAD and self.nRoadLimitSpeed > 0:
+          # forks / rotary: hold the road limit (needs a posted limit to know what to hold)
           self.xTurnSpeed = float(self.nRoadLimitSpeed)
           self.xTurnDist = nTBTDist
         else:
@@ -353,7 +362,10 @@ class TmapMapData(BaseMapData):
     with self._lock:
       if self._fresh():
         limit = f"{int(self.nRoadLimitSpeed)}km/h" if self.nRoadLimitSpeed >= MIN_VALID_SPEED_LIMIT else "none"
-        status = f"Connected - limit {limit} - {self._remote_ip}"
+        # append live TBT debug so turn control can be diagnosed from the tab: t=nTBTTurnType
+        # (-1 = app sends no turn-by-turn data), d=nTBTDist (m to the turn), trn=resolved speed
+        status = (f"Connected - limit {limit} - {self._remote_ip} - "
+                  f"TBT t{self._dbg_tbt_type} d{self._dbg_tbt_dist} trn{int(self.xTurnSpeed)}")
         # cluster shows the upcoming CAMERA limit only (camera-centric): xSpdLimit is non-zero
         # while a speed camera is ahead and clears to 0 after passing. Exclude speed bumps
         # (xSpdType 22) so only camera warnings light up the dash.
