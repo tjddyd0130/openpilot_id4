@@ -54,7 +54,12 @@ T_IDXS = np.array(T_IDXS_LST)
 FCW_IDXS = T_IDXS < 5.0
 T_DIFFS = np.diff(T_IDXS, prepend=[0.])
 COMFORT_BRAKE = 2.5
-STOP_DISTANCE = 6.0
+# tjddyd VW MEB tuning: standstill stopping distance behind a lead. Stock openpilot is 6.0 m,
+# which felt too far at city stops on this car. Reduced to 4.5 m (still a safe rear-end margin,
+# closer to factory ACC). This constant is BAKED INTO THE ACADOS SOLVER at build time, so it is
+# regenerated whenever this file changes (SConscript lists long_mpc.py as a source dependency).
+# It is the rear-end safety margin -- keep it conservative; do not set it tighter without care.
+STOP_DISTANCE = 4.5
 CRUISE_MIN_ACCEL = -1.2
 CRUISE_MAX_ACCEL = 1.6
 MIN_X_LEAD_FACTOR = 0.5
