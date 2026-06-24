@@ -78,19 +78,26 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
     self.a_desired_trajectory = np.zeros(CONTROL_N)
     self.j_desired_trajectory = np.zeros(CONTROL_N)
 
-    # tjddyd VW MEB opt-in: low-speed close-follow. Gated to VW MEB and to the toggle being on.
+    # tjddyd VW MEB opt-in: low-speed close-follow + tunable standstill distance.
+    # Both gated to VW MEB; non-MEB keeps stock behaviour.
     self.params = Params()
     self._frame = 0
     self.is_meb = self.CP.brand == "volkswagen" and bool(self.CP.flags & VolkswagenFlags.MEB)
-    self._update_low_speed_follow()
+    self._update_meb_long_params()
 
-  def _update_low_speed_follow(self):
-    # Only MEB + opt-in toggle scales t_follow; otherwise factor stays 1.0 (stock, no effect).
+  def _update_meb_long_params(self):
+    # Low-speed close-follow: only MEB + opt-in toggle scales t_follow; else 1.0 (stock).
     factor = 1.0
     if self.is_meb and self.params.get_bool("MebLowSpeedCloseFollow"):
       pct = self.params.get("MebLowSpeedFollowPercent", return_default=True)
       factor = min(max(int(pct), 50), 100) / 100.0
     self.mpc.low_speed_tfollow_factor = factor
+
+    # Standstill stopping distance: runtime solver parameter (carrot-style). On MEB read the
+    # MebStopDistance param (units of 0.1 m), clamped to a safe 3.0-6.0 m. Non-MEB keeps stock.
+    if self.is_meb:
+      sd = self.params.get("MebStopDistance", return_default=True)
+      self.mpc.stop_distance = min(max(int(sd) * 0.1, 3.0), 6.0)
 
   @staticmethod
   def parse_model(model_msg):
@@ -115,10 +122,10 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
   def update(self, sm):
     LongitudinalPlannerSP.update(self, sm)
 
-    # tjddyd: refresh the low-speed close-follow factor ~every 5 s (cheap, MEB-gated)
+    # tjddyd: refresh the MEB long params (close-follow + stop distance) ~every 5 s (cheap)
     self._frame += 1
     if self._frame % 100 == 0:
-      self._update_low_speed_follow()
+      self._update_meb_long_params()
 
     if len(sm['carControl'].orientationNED) == 3:
       accel_coast = get_coast_accel(sm['carControl'].orientationNED[1])

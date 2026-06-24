@@ -27,7 +27,7 @@ MPC_SOURCES = (LongitudinalPlanSource.lead0, LongitudinalPlanSource.lead1, Longi
 
 X_DIM = 3
 U_DIM = 1
-PARAM_DIM = 6
+PARAM_DIM = 7  # tjddyd: +1 for runtime stop_distance (index 6), carrot-style live tuning
 COST_E_DIM = 5
 COST_DIM = COST_E_DIM + 1
 CONSTR_DIM = 4
@@ -54,12 +54,11 @@ T_IDXS = np.array(T_IDXS_LST)
 FCW_IDXS = T_IDXS < 5.0
 T_DIFFS = np.diff(T_IDXS, prepend=[0.])
 COMFORT_BRAKE = 2.5
-# tjddyd VW MEB tuning: standstill stopping distance behind a lead. Stock openpilot is 6.0 m,
-# which felt too far at city stops on this car. Reduced to 4.5 m (still a safe rear-end margin,
-# closer to factory ACC). This constant is BAKED INTO THE ACADOS SOLVER at build time, so it is
-# regenerated whenever this file changes (SConscript lists long_mpc.py as a source dependency).
-# It is the rear-end safety margin -- keep it conservative; do not set it tighter without care.
-STOP_DISTANCE = 4.5
+# Stock standstill stopping distance behind a lead (m). Kept as the stock 6.0 default; on VW MEB
+# the planner overrides it at runtime via a solver parameter (carrot-style, see below), so it can
+# be tuned live without a rebuild. This value is only the fallback/default for non-MEB and for the
+# solver's initial parameter_values.
+STOP_DISTANCE = 6.0
 CRUISE_MIN_ACCEL = -1.2
 CRUISE_MAX_ACCEL = 1.6
 MIN_X_LEAD_FACTOR = 0.5
@@ -88,8 +87,8 @@ def get_T_FOLLOW(personality=log.LongitudinalPersonality.standard):
 def get_stopped_equivalence_factor(v_lead):
   return (v_lead**2) / (2 * COMFORT_BRAKE)
 
-def get_safe_obstacle_distance(v_ego, t_follow):
-  return (v_ego**2) / (2 * COMFORT_BRAKE) + t_follow * v_ego + STOP_DISTANCE
+def get_safe_obstacle_distance(v_ego, t_follow, stop_distance=STOP_DISTANCE):
+  return (v_ego**2) / (2 * COMFORT_BRAKE) + t_follow * v_ego + stop_distance
 
 def gen_long_model():
   model = AcadosModel()
@@ -116,7 +115,8 @@ def gen_long_model():
   a_prev = SX.sym('a_prev')
   lead_t_follow = SX.sym('lead_t_follow')
   lead_danger_factor = SX.sym('lead_danger_factor')
-  model.p = vertcat(a_min, a_max, x_obstacle, a_prev, lead_t_follow, lead_danger_factor)
+  stop_distance = SX.sym('stop_distance')  # tjddyd: runtime-tunable standstill distance
+  model.p = vertcat(a_min, a_max, x_obstacle, a_prev, lead_t_follow, lead_danger_factor, stop_distance)
 
   # dynamics model
   f_expl = vertcat(v_ego, a_ego, j_ego)
@@ -151,11 +151,12 @@ def gen_long_ocp():
   a_prev = ocp.model.p[3]
   lead_t_follow = ocp.model.p[4]
   lead_danger_factor = ocp.model.p[5]
+  stop_distance = ocp.model.p[6]
 
   ocp.cost.yref = np.zeros((COST_DIM, ))
   ocp.cost.yref_e = np.zeros((COST_E_DIM, ))
 
-  desired_dist_comfort = get_safe_obstacle_distance(v_ego, lead_t_follow)
+  desired_dist_comfort = get_safe_obstacle_distance(v_ego, lead_t_follow, stop_distance)
 
   # The main cost in normal operation is how close you are to the "desired" distance
   # from an obstacle at every timestep. This obstacle can be a lead car
@@ -181,7 +182,7 @@ def gen_long_ocp():
 
   x0 = np.zeros(X_DIM)
   ocp.constraints.x0 = x0
-  ocp.parameter_values = np.array([-1.2, 1.2, 0.0, 0.0, get_T_FOLLOW(), LEAD_DANGER_FACTOR])
+  ocp.parameter_values = np.array([-1.2, 1.2, 0.0, 0.0, get_T_FOLLOW(), LEAD_DANGER_FACTOR, STOP_DISTANCE])
 
 
   # We put all constraint cost weights to 0 and only set them at runtime
@@ -226,10 +227,13 @@ class LongitudinalMpc:
     self.source = LongitudinalPlanSource.cruise
     # tjddyd VW MEB opt-in: low-speed close-follow factor. 1.0 == stock (no effect).
     # The planner sets this (<1.0) only on MEB with the toggle on; it scales the runtime
-    # t_follow at low speed to tighten the stop-and-go gap. The compiled STOP_DISTANCE (6 m
-    # standstill safety gap) is NOT touched, so the car still stops a full 6 m behind a
-    # stopped lead -- only the moving t_follow*v term below 30 km/h shrinks.
+    # t_follow at low speed to tighten the stop-and-go gap. This only affects the moving
+    # t_follow*v term below 30 km/h; the standstill gap is set by self.stop_distance below.
     self.low_speed_tfollow_factor = 1.0
+    # tjddyd VW MEB opt-in: standstill stopping distance (m), now a runtime solver parameter
+    # (carrot-style) so it is tunable live without a rebuild. The planner sets it from a param on
+    # MEB; default stays the stock 6.0 so non-MEB behaviour is unchanged.
+    self.stop_distance = STOP_DISTANCE
 
   def reset(self):
     self.solver.reset()
@@ -353,7 +357,7 @@ class LongitudinalMpc:
     # TODO does this make sense when max_a is negative?
     v_upper = v_ego + (T_IDXS * CRUISE_MAX_ACCEL * 1.05)
     v_cruise_clipped = np.clip(v_cruise * np.ones(N+1), v_lower, v_upper)
-    cruise_obstacle = np.cumsum(T_DIFFS * v_cruise_clipped) + get_safe_obstacle_distance(v_cruise_clipped, t_follow)
+    cruise_obstacle = np.cumsum(T_DIFFS * v_cruise_clipped) + get_safe_obstacle_distance(v_cruise_clipped, t_follow, self.stop_distance)
 
     x_obstacles = np.column_stack([lead_0_obstacle, lead_1_obstacle, cruise_obstacle])
     self.source = MPC_SOURCES[np.argmin(x_obstacles[0])]
@@ -369,6 +373,7 @@ class LongitudinalMpc:
     self.params[:,3] = np.copy(self.a_prev)
     self.params[:,4] = t_follow
     self.params[:,5] = LEAD_DANGER_FACTOR
+    self.params[:,6] = self.stop_distance  # tjddyd: runtime standstill distance
 
     self.run()
     if (np.any(lead_xv_0[FCW_IDXS,0] - self.x_sol[FCW_IDXS,0] < CRASH_DISTANCE) and

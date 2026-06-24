@@ -107,6 +107,12 @@ DESCRIPTIONS = {
     "Low-speed follow gap as a percent of stock (100 = stock, lower = closer below 30 km/h). "
     "Only used when the low-speed close-follow toggle above is on."
   ),
+  "MebStopDistance": tr_noop(
+    "VW MEB only: how far behind a stopped lead the car comes to rest, in 0.1 m units "
+    "(45 = 4.5 m; stock openpilot is 6.0 m = 60). This is a live solver parameter, so it takes "
+    "effect without a rebuild once the new solver is built. Lower = stops closer; this is the "
+    "rear-end safety margin, so keep it sensible (min 3.0 m). Requires openpilot longitudinal."
+  ),
 }
 
 
@@ -213,6 +219,19 @@ class TjddydLayout(Widget):
     )
     self._option_items.append(follow_opt)
     items.append(follow_opt)
+
+    # Standstill stopping distance behind a lead (runtime solver param, live-tunable on MEB)
+    stop_opt = option_item_sp(
+      title=(lambda: tr("VW MEB: Stop distance behind lead (x0.1 m)")),
+      param="MebStopDistance",
+      min_value=30,
+      max_value=60,
+      description=(lambda: tr(DESCRIPTIONS["MebStopDistance"])),
+      value_change_step=1,
+      enabled=lambda: True,
+    )
+    self._option_items.append(stop_opt)
+    items.append(stop_opt)
 
     self._scroller = Scroller(items, line_separator=True, spacing=0)
 
