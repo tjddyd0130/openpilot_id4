@@ -86,13 +86,6 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
     self._update_meb_long_params()
 
   def _update_meb_long_params(self):
-    # Low-speed close-follow: only MEB + opt-in toggle scales t_follow; else 1.0 (stock).
-    factor = 1.0
-    if self.is_meb and self.params.get_bool("MebLowSpeedCloseFollow"):
-      pct = self.params.get("MebLowSpeedFollowPercent", return_default=True)
-      factor = min(max(int(pct), 50), 100) / 100.0
-    self.mpc.low_speed_tfollow_factor = factor
-
     # Standstill stopping distance: runtime solver parameter (carrot-style). On MEB read the
     # MebStopDistance param (units of 0.1 m), clamped to a safe 3.0-6.0 m. Non-MEB keeps stock.
     if self.is_meb:

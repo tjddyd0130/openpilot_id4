@@ -225,11 +225,6 @@ class LongitudinalMpc:
     self.solver = AcadosOcpSolverCython(MODEL_NAME, ACADOS_SOLVER_TYPE, N)
     self.reset()
     self.source = LongitudinalPlanSource.cruise
-    # tjddyd VW MEB opt-in: low-speed close-follow factor. 1.0 == stock (no effect).
-    # The planner sets this (<1.0) only on MEB with the toggle on; it scales the runtime
-    # t_follow at low speed to tighten the stop-and-go gap. This only affects the moving
-    # t_follow*v term below 30 km/h; the standstill gap is set by self.stop_distance below.
-    self.low_speed_tfollow_factor = 1.0
     # tjddyd VW MEB opt-in: standstill stopping distance (m), now a runtime solver parameter
     # (carrot-style) so it is tunable live without a rebuild. The planner sets it from a param on
     # MEB; default stays the stock 6.0 so non-MEB behaviour is unchanged.
@@ -331,15 +326,6 @@ class LongitudinalMpc:
   def update(self, radarstate, v_cruise, personality=log.LongitudinalPersonality.standard):
     t_follow = get_T_FOLLOW(personality)
     v_ego = self.x0[1]
-
-    # tjddyd VW MEB opt-in: tighten the LOW-SPEED moving follow gap (the t_follow*v term)
-    # below 30 km/h. Blends from the configured factor at standstill up to stock (1.0) at
-    # 30 km/h, so highway following is unchanged. Only the runtime t_follow param is scaled;
-    # the compiled 6 m standstill distance is untouched (car still stops 6 m behind a stopped
-    # lead). low_speed_tfollow_factor == 1.0 by default -> byte-identical to stock.
-    if self.low_speed_tfollow_factor < 1.0:
-      v_blend = min(max(v_ego / (30.0 / 3.6), 0.0), 1.0)  # 0 at standstill -> 1 at >=30 km/h
-      t_follow *= self.low_speed_tfollow_factor + (1.0 - self.low_speed_tfollow_factor) * v_blend
     self.status = radarstate.leadOne.status or radarstate.leadTwo.status
 
     lead_xv_0 = self.process_lead(radarstate.leadOne)
