@@ -399,11 +399,12 @@ class TmapMapData(BaseMapData):
     # Camera speed limit (kph) for the MEB cluster (ACC_Tempolimit): appears at a speed
     # camera and disappears after passing -- mirrors the camera-centric onroad UI.
     self.params.put("TmapRoadLimit", cluster_limit)
-    # tjddyd: turn/curve target speed (kph) for the MEB cluster predictive CURVE event. Non-zero
-    # while the turn controller is slowing for a turn; clears to 0 otherwise. Shown on the dash as
-    # a curve-deceleration event, distinct from the speed-camera sign (carstate injects this into
-    # cruiseState.speedLimitPredicative with type=curve).
-    self.params.put("TmapTurnSpeed", int(round(turn_speed * CV.MS_TO_KPH)) if turn_speed > 0 else 0)
+    # tjddyd: a nav TBT turn is an intersection (left/right/u-turn), NOT a road curve, so it does
+    # NOT drive the cluster CURVE event -- the dash curve glyph is reserved for real curves, which
+    # the SCC-Vision controller detects and surfaces via the TmapCurveSpeed param (written by the
+    # planner). TBT turns still slow the car (planner turn channel); they just show nothing on the
+    # cluster. Keep the param cleared so a stale value never lights the dash.
+    self.params.put("TmapTurnSpeed", 0)
     # tjddyd: speed-bump pass speed (kph) for the MEB cluster predictive "speed limit ahead" event
     # (ACC_Events 4). Non-zero while a bump is ahead; clears after. carstate injects it into
     # cruiseState.speedLimitPredicative with type=speed-limit so the dash shows a distinct event.

@@ -7,7 +7,9 @@ See the LICENSE.md file in the root directory for more details.
 
 from cereal import messaging, custom
 from opendbc.car import structs
+from opendbc.car.volkswagen.values import VolkswagenFlags
 from openpilot.common.constants import CV
+from openpilot.common.params import Params
 from openpilot.selfdrive.car.cruise import V_CRUISE_MAX
 from openpilot.sunnypilot.selfdrive.controls.lib.dec.dec import DynamicExperimentalController
 from openpilot.sunnypilot.selfdrive.controls.lib.e2e_alerts_helper import E2EAlertsHelper
@@ -19,6 +21,7 @@ from openpilot.sunnypilot.models.helpers import get_active_bundle
 
 DecState = custom.LongitudinalPlanSP.DynamicExperimentalControl.DynamicExperimentalControlState
 LongitudinalPlanSource = custom.LongitudinalPlanSP.LongitudinalPlanSource
+VisionState = custom.LongitudinalPlanSP.SmartCruiseControl.VisionState
 
 TMAP_DECEL_ACCEL_FLOOR = -2.5  # m/s^2, comfort floor for carrot-curve TMAP camera/bump deceleration
 
@@ -37,6 +40,11 @@ class LongitudinalPlannerSP:
 
     self.output_v_target = 0.
     self.output_a_target = 0.
+
+    # tjddyd: surface the SCC-Vision curve slowdown to the MEB cluster (curve event + model speed).
+    self.params = Params()
+    self.is_meb = CP.brand == "volkswagen" and bool(CP.flags & VolkswagenFlags.MEB)
+    self._curve_cluster_kph_last = -1
 
     # tjddyd: speed the driver reached by pressing the gas while we were slowing for a speed
     # bump. Once captured it becomes the bump pass speed for the rest of that bump event, so we
@@ -60,6 +68,21 @@ class LongitudinalPlannerSP:
 
     # Smart Cruise Control
     self.scc.update(sm, long_enabled, long_override, v_ego, a_ego, v_cruise)
+
+    # tjddyd: surface the SCC-Vision curve slowdown to the MEB cluster as the predictive CURVE
+    # event with the model's target speed. Only the vision controller drives this -- a nav TBT turn
+    # is an intersection, not a curve. Show while slowing into/through the curve (entering/turning),
+    # not while regaining speed (leaving). Written on-change (kph) to TmapCurveSpeed; carstate reads
+    # it and injects the curve event. MEB-gated so other cars are untouched.
+    if self.is_meb:
+      curve_kph = 0
+      if self.scc.vision.state in (VisionState.entering, VisionState.turning):
+        vt = self.scc.vision.output_v_target
+        if vt > 0:
+          curve_kph = max(0, min(250, int(round(vt * CV.MS_TO_KPH))))
+      if curve_kph != self._curve_cluster_kph_last:
+        self.params.put("TmapCurveSpeed", curve_kph)
+        self._curve_cluster_kph_last = curve_kph
 
     # Speed Limit Resolver
     self.resolver.update(v_ego, sm)

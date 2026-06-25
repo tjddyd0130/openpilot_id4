@@ -1,0 +1,78 @@
+From a1b2c3d4e5f600000000000000000000000000aa Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 25 Jun 2026 07:00:00 +0000
+Subject: [PATCH] VW MEB: drive cluster CURVE event from SCC-Vision, not TBT
+ turns
+
+A nav TBT turn (left/right/u-turn) is an intersection, not a road curve, so it
+should not light the cluster CURVE glyph. Reserve that event for real curves,
+which the sunnypilot SCC-Vision controller detects from the model path. The
+openpilot planner now writes the vision curve target speed to TmapCurveSpeed
+(kph) while slowing into/through a curve; carstate reads that instead of
+TmapTurnSpeed and injects it as the curve event with the model's target speed.
+
+Priority is unchanged (camera > bump > curve); only the curve source moved from
+the TBT turn channel to the vision controller. Display-only; never caps speed.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_015XiGYrFo4VxceB8UKz4mPV
+---
+ opendbc/car/volkswagen/carstate.py | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
+
+diff --git a/opendbc/car/volkswagen/carstate.py b/opendbc/car/volkswagen/carstate.py
+index 32a09cac..a0c0c0c0 100644
+--- a/opendbc/car/volkswagen/carstate.py
++++ b/opendbc/car/volkswagen/carstate.py
+@@ -39,8 +39,8 @@ class CarState(CarStateBase, MadsCarState):
+     # tjddyd: TMAP road limit (m/s) for the MEB cluster display, refreshed ~2x/sec from a param
+     self._tmap_params = Params() if Params is not None else None
+     self._tmap_cluster_speed_limit = 0.
+-    # tjddyd: TMAP turn/curve target speed (m/s) for the cluster predictive CURVE event
+-    self._tmap_turn_speed = 0.
++    # tjddyd: SCC-Vision curve target speed (m/s) for the cluster predictive CURVE event
++    self._tmap_curve_speed = 0.
+     # tjddyd: TMAP speed-bump pass speed (m/s) for the cluster predictive "speed limit ahead" event
+     self._tmap_bump_speed = 0.
+     self.force_rhd_for_bsm = False
+@@ -413,29 +413,29 @@ class CarState(CarStateBase, MadsCarState):
+       if ret.cruiseState.speedLimit == 0 and self._tmap_cluster_speed_limit > 0:
+         ret.cruiseState.speedLimit = self._tmap_cluster_speed_limit
+ 
+-      # tjddyd: TMAP turn/curve slowdown -> drive the cluster's predictive CURVE event
+-      # (ACC_Events=6) so a turn is shown distinctly from a speed-camera sign. Only inject when
+-      # no camera limit is active, so the camera sign keeps priority and the two never collide.
+-      # TmapTurnSpeed (kph) is written by the openpilot mapd while the turn controller is active.
++      # tjddyd: SCC-Vision curve slowdown -> drive the cluster's predictive CURVE event
++      # (ACC_Events=6) with the model's curve target speed, shown distinctly from a camera sign.
++      # A nav TBT turn is an intersection (not a curve) and intentionally does NOT drive this;
++      # only the vision controller does. TmapCurveSpeed (kph) is written by the openpilot planner.
+       # tjddyd: TMAP speed bump -> drive the cluster's predictive "speed limit ahead" event
+       # (ACC_Events=4) with the bump pass speed, distinct from both the camera sign and the curve
+       # event. TmapBumpSpeed (kph) is written by the openpilot mapd while a bump is ahead.
+       if self.frame % 50 == 0:
+         try:
+-          self._tmap_turn_speed = int(self._tmap_params.get("TmapTurnSpeed", return_default=True)) * CV.KPH_TO_MS
++          self._tmap_curve_speed = int(self._tmap_params.get("TmapCurveSpeed", return_default=True)) * CV.KPH_TO_MS
+           self._tmap_bump_speed = int(self._tmap_params.get("TmapBumpSpeed", return_default=True)) * CV.KPH_TO_MS
+         except Exception:
+-          self._tmap_turn_speed = 0.
++          self._tmap_curve_speed = 0.
+           self._tmap_bump_speed = 0.
+       # only inject when no camera limit is active (camera sign keeps top priority).
+       # Among predictive events the order is: bump (speed-limit-ahead) over curve, per request.
+       # Net cluster alert priority: camera > bump > curve.
+       if ret.cruiseState.speedLimit == 0:
+         if self._tmap_bump_speed > 0:
+           ret.cruiseState.speedLimitPredicative = self._tmap_bump_speed
+           self.speed_limit_predicative_type = PSD_TYPE_SPEED_LIMIT  # -> ACC_Events 4 (ahead)
+-        elif self._tmap_turn_speed > 0:
+-          ret.cruiseState.speedLimitPredicative = self._tmap_turn_speed
++        elif self._tmap_curve_speed > 0:
++          ret.cruiseState.speedLimitPredicative = self._tmap_curve_speed
+           self.speed_limit_predicative_type = PSD_TYPE_CURV_SPEED
+ 
+     ret_sp.speedLimit = ret.cruiseState.speedLimit
+--
+2.43.0
+ 
