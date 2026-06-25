@@ -1,0 +1,44 @@
+From c3d4e5f6a7b800000000000000000000000000cc Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 25 Jun 2026 10:00:00 +0000
+Subject: [PATCH] VW MEB: cluster predictive priority curve over turn
+
+Reorder the two TMAP predictive cluster events so a vision curve wins over a nav
+turn/intersection. Net cluster alert priority is now camera > curve > turn
+(intersection). Camera still keeps top priority (the predictive events are only
+injected when no camera limit is active). Display-only; never caps speed.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_015XiGYrFo4VxceB8UKz4mPV
+---
+ opendbc/car/volkswagen/carstate.py | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/opendbc/car/volkswagen/carstate.py b/opendbc/car/volkswagen/carstate.py
+index e5e5e5e5..e6e6e6e6 100644
+--- a/opendbc/car/volkswagen/carstate.py
++++ b/opendbc/car/volkswagen/carstate.py
+@@ -424,12 +424,12 @@ class CarState(CarStateBase, MadsCarState):
+       # only inject when no camera limit is active (camera sign keeps top priority).
+-      # Among predictive events a nav turn/intersection wins over a vision curve.
+-      # Net cluster alert priority: camera > turn (intersection) > curve.
++      # Among predictive events a vision curve wins over a nav turn/intersection.
++      # Net cluster alert priority: camera > curve > turn (intersection).
+       if ret.cruiseState.speedLimit == 0:
+-        if self._tmap_turn_speed > 0:
+-          ret.cruiseState.speedLimitPredicative = self._tmap_turn_speed
+-          self.speed_limit_predicative_type = PSD_TYPE_TURN  # -> ACC_Events 9 (intersection)
+-        elif self._tmap_curve_speed > 0:
+-          ret.cruiseState.speedLimitPredicative = self._tmap_curve_speed
+-          self.speed_limit_predicative_type = PSD_TYPE_CURV_SPEED
++        if self._tmap_curve_speed > 0:
++          ret.cruiseState.speedLimitPredicative = self._tmap_curve_speed
++          self.speed_limit_predicative_type = PSD_TYPE_CURV_SPEED  # -> ACC_Events 6 (curve)
++        elif self._tmap_turn_speed > 0:
++          ret.cruiseState.speedLimitPredicative = self._tmap_turn_speed
++          self.speed_limit_predicative_type = PSD_TYPE_TURN  # -> ACC_Events 9 (intersection)
+ 
+     ret_sp.speedLimit = ret.cruiseState.speedLimit
+--
+2.43.0
+ 
