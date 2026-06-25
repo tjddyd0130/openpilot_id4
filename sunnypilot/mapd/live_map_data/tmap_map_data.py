@@ -46,6 +46,19 @@ TURN_TYPES_TURN = (12, 16, 13, 19, 14)      # left / sharp-left / right / sharp-
 TURN_TYPES_ROAD = (6, 7, 131)               # forks / rotary -> hold the road limit
 
 
+def _interp(x: float, xp: tuple, fp: tuple) -> float:
+  # tiny linear interpolation with flat ends (numpy-free); xp must be ascending
+  if x <= xp[0]:
+    return fp[0]
+  if x >= xp[-1]:
+    return fp[-1]
+  for i in range(1, len(xp)):
+    if x < xp[i]:
+      t = (x - xp[i - 1]) / (xp[i] - xp[i - 1])
+      return fp[i - 1] + t * (fp[i] - fp[i - 1])
+  return fp[-1]
+
+
 class _NaviHandler(BaseHTTPRequestHandler):
   # The modern T map / KakaoNavi phone app POSTs route guidance to /api/navi/<version>
   # as {"rgdata": {...}}; rgdata carries the same fields the UDP path used.
@@ -117,6 +130,7 @@ class TmapMapData(BaseMapData):
     self.autoNaviSpeedBumpSpeed = 35.0
     self.autoTurnControl = 0          # 0 = off
     self.autoTurnControlSpeedTurn = 20  # kph, target speed through a turn
+    self.autoTurnControlStartDist = 60  # m, only start slowing for a turn within this distance
 
     threading.Thread(target=self._udp_thread, daemon=True).start()
     threading.Thread(target=self._broadcast_thread, daemon=True).start()
@@ -183,6 +197,7 @@ class TmapMapData(BaseMapData):
     self.autoNaviSpeedBumpSpeed = float(self.params.get("AutoNaviSpeedBumpSpeed", return_default=True))
     self.autoTurnControl = self.params.get("AutoTurnControl", return_default=True)
     self.autoTurnControlSpeedTurn = float(self.params.get("AutoTurnControlSpeedTurn", return_default=True))
+    self.autoTurnControlStartDist = float(self.params.get("AutoTurnControlStartDist", return_default=True))
 
   def _udp_thread(self) -> None:
     while True:
@@ -286,25 +301,28 @@ class TmapMapData(BaseMapData):
         self.xSpdType = -1
         self.xSpdDist = 0
 
-      # carrot update_auto_turn: slow down for an upcoming turn/intersection (TBT).
-      # Actual turns use the configured turn speed; forks/rotary hold the road limit.
+      # carrot update_auto_turn: slow down for an upcoming turn/intersection (TBT). carrot only
+      # ACTIVATES the slowdown once the turn is within atc_start_dist (outside it the turn is just
+      # "prepare", no decel) -- otherwise the kinematic ramp would already be braking 400-500 m out
+      # when the configured decel rate is gentle. Surface the turn only inside that gate; the
+      # resolver/planner then shape the same ramp from here in.
+      self.xTurnSpeed = 0
+      self.xTurnDist = 0
       if self.autoTurnControl > 0 and nTBTDist > 0:
         if nTBTTurnType in TURN_TYPES_TURN:
-          # actual left/right/u-turn: use the configured turn speed. This does NOT depend on the
-          # posted road limit, so don't gate it on nRoadLimitSpeed (that gate blocked turns on
-          # roads where TMAP sends no limit).
-          self.xTurnSpeed = self.autoTurnControlSpeedTurn
-          self.xTurnDist = nTBTDist
+          # actual left/right/u-turn: use the configured turn speed. carrot start_turn_dist scales
+          # with the next road width (43-60 m); TMAP gives no width, so use a tunable fixed value.
+          # Does NOT depend on the posted road limit (that gate blocked turns where TMAP sends none).
+          if nTBTDist <= self.autoTurnControlStartDist:
+            self.xTurnSpeed = self.autoTurnControlSpeedTurn
+            self.xTurnDist = nTBTDist
         elif nTBTTurnType in TURN_TYPES_ROAD and self.nRoadLimitSpeed > 0:
-          # forks / rotary: hold the road limit (needs a posted limit to know what to hold)
-          self.xTurnSpeed = float(self.nRoadLimitSpeed)
-          self.xTurnDist = nTBTDist
-        else:
-          self.xTurnSpeed = 0
-          self.xTurnDist = 0
-      else:
-        self.xTurnSpeed = 0
-        self.xTurnDist = 0
+          # forks / rotary: hold the road limit (needs a posted limit to know what to hold). carrot
+          # start_fork_dist scales with the road limit so highway forks start braking earlier.
+          start_fork_dist = _interp(self.nRoadLimitSpeed, (30, 50, 100), (160, 200, 350))
+          if nTBTDist <= start_fork_dist:
+            self.xTurnSpeed = float(self.nRoadLimitSpeed)
+            self.xTurnDist = nTBTDist
 
       self._last_rx = time.monotonic()
 

@@ -55,6 +55,10 @@ TMAP_OPTIONS = [
   ("AutoTurnControlDecelRate", "Turn decel rate (x0.01 m/s2)",
    "How firmly to slow for a turn. Lower = gentler / eases in earlier (less like braking); "
    "higher = firmer and later. Separate from the camera rate.", 50, 200, 10),
+  ("AutoTurnControlStartDist", "Turn slowdown start distance (m)",
+   "How close to an actual turn before slowing begins (carrot atc_start_dist). Smaller = starts "
+   "later / nearer the turn (no more braking from far away); larger = starts earlier. "
+   "Forks/rotaries start farther out automatically, scaled by the road limit.", 30, 200, 10),
 ]
 
 # Description constants (English)
