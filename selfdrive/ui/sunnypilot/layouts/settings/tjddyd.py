@@ -52,6 +52,9 @@ TMAP_OPTIONS = [
    "Target speed through an actual left/right/u-turn.", 10, 60, 5),
   ("AutoTurnControlTurnEnd", "Turn finish margin (s)",
    "Reach the turn speed this many seconds before the turn.", 1, 20, 1),
+  ("AutoTurnControlDecelRate", "Turn decel rate (x0.01 m/s2)",
+   "How firmly to slow for a turn. Lower = gentler / eases in earlier (less like braking); "
+   "higher = firmer and later. Separate from the camera rate.", 50, 200, 10),
 ]
 
 # Description constants (English)

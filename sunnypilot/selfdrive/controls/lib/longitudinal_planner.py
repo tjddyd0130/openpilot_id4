@@ -111,42 +111,54 @@ class LongitudinalPlannerSP:
       if self.resolver.tmap_turn_speed > 0.:
         v_turn = self.resolver.tmap_turn_speed
         dd = max(0., self.resolver.tmap_turn_dist - v_turn * self.resolver.tmap_turn_end)
-        tmap_target = min(tmap_target, max(v_turn, (v_turn ** 2 + 2.0 * self.resolver.tmap_decel_rate * dd) ** 0.5))
+        tmap_target = min(tmap_target, max(v_turn, (v_turn ** 2 + 2.0 * self.resolver.tmap_turn_decel_rate * dd) ** 0.5))
       targets[LongitudinalPlanSource.speedLimitAssist] = (tmap_target, a_ego)
 
     self.source = min(targets, key=lambda k: targets[k][0])
     self.output_v_target, self.output_a_target = targets[self.source]
     return self.output_v_target, self.output_a_target
 
+  def _tmap_event_accel(self, v_ego: float, v_target: float, distance: float, end_s: float, decel_rate: float) -> float:
+    # carrot curve's implied (constant) deceleration to reach v_target at the carrot margin point.
+    # It self-eases to 0 as v_ego -> v_target and steepens if we are behind the curve, but is
+    # capped at the configured decel rate so the slowdown stays smooth (the rate setting controls
+    # firmness instead of slamming to the comfort floor). TMAP_DECEL_ACCEL_FLOOR is a safety bound.
+    if v_ego <= v_target + 0.1:
+      return 0.0  # no decel needed
+    decel_dist = max(1.0, distance - v_target * end_s)
+    a_carrot = (v_target ** 2 - v_ego ** 2) / (2.0 * decel_dist)
+    return max(a_carrot, -decel_rate, TMAP_DECEL_ACCEL_FLOOR)
+
   def tmap_decel_accel(self, v_ego: float, a_target: float) -> float:
-    # tjddyd option 2: when a TMAP camera/bump is ahead, also command the carrot curve's
-    # implied deceleration so if2's MPC follows it tightly -- the v_target cap alone is chased
-    # too gently, which felt imprecise at the camera. a_carrot is the constant decel needed to
-    # reach the limit at the carrot margin point; it self-eases to 0 as v_ego -> the limit and
-    # steepens if we are behind the curve. We take the min with the MPC accel so a closer lead
-    # can still brake harder, and clip to a comfort floor. Gated on use_tmap (base unaffected).
-    if not (self.resolver.use_tmap and self.resolver.speed_limit > 0.):
+    # Command the carrot-curve deceleration for whichever TMAP event is ahead so if2's MPC follows
+    # it smoothly -- the v_target cap alone is chased too loosely (camera felt imprecise, turn felt
+    # like a brake). Each event is capped at its own rate: camera (tmap_decel_rate), bump (firmer),
+    # turn (gentler, so a turn eases in naturally). We take the most-binding decel, then min with
+    # the MPC accel so a closer lead can still brake harder. Gated on use_tmap (base unaffected).
+    if not self.resolver.use_tmap:
       return a_target
 
-    if self.resolver.tmap_ahead_is_bump:
-      v_limit = max(self.resolver.speed_limit_final, self._bump_override_speed)
-      end_s = self.resolver.tmap_bump_time
-      decel_rate = self.resolver.tmap_bump_decel_rate
-    else:
-      v_limit = self.resolver.speed_limit_final
-      end_s = self.resolver.tmap_ctrl_end
-      decel_rate = self.resolver.tmap_decel_rate
+    accels = []
+    # camera / section / bump (sign-bearing event)
+    if self.resolver.speed_limit > 0.:
+      if self.resolver.tmap_ahead_is_bump:
+        v_limit = max(self.resolver.speed_limit_final, self._bump_override_speed)
+        end_s = self.resolver.tmap_bump_time
+        decel_rate = self.resolver.tmap_bump_decel_rate
+      else:
+        v_limit = self.resolver.speed_limit_final
+        end_s = self.resolver.tmap_ctrl_end
+        decel_rate = self.resolver.tmap_decel_rate
+      accels.append(self._tmap_event_accel(v_ego, v_limit, self.resolver.distance, end_s, decel_rate))
+    # turn / intersection (its own gentle rate so it eases in instead of feeling like a brake)
+    if self.resolver.tmap_turn_speed > 0.:
+      accels.append(self._tmap_event_accel(v_ego, self.resolver.tmap_turn_speed, self.resolver.tmap_turn_dist,
+                                           self.resolver.tmap_turn_end, self.resolver.tmap_turn_decel_rate))
 
-    if v_ego <= v_limit + 0.1:
+    accels = [a for a in accels if a < 0.0]
+    if not accels:
       return a_target
-
-    decel_dist = max(1.0, self.resolver.distance - v_limit * end_s)
-    a_carrot = (v_limit ** 2 - v_ego ** 2) / (2.0 * decel_dist)
-    # Don't brake harder than the configured decel rate, so the slowdown is smooth and the
-    # decel-rate setting actually controls firmness (a close event no longer slams to the comfort
-    # floor). Bumps use their own (firmer) rate. TMAP_DECEL_ACCEL_FLOOR is an absolute safety bound.
-    a_carrot = max(a_carrot, -decel_rate, TMAP_DECEL_ACCEL_FLOOR)
-    return min(a_target, a_carrot)
+    return min(a_target, min(accels))
 
   def update(self, sm: messaging.SubMaster) -> None:
     self.events_sp.clear()

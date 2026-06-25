@@ -70,6 +70,8 @@ class SpeedLimitResolver:
     self.tmap_ctrl_end = 7.0     # s, finish decel this many seconds before a camera
     self.tmap_bump_time = 1.0    # s, finish decel this many seconds before a speed bump
     self.tmap_turn_end = 6.0     # s, finish decel this many seconds before a turn
+    self.tmap_turn_decel_rate = 1.0  # m/s^2 (AutoTurnControlDecelRate * 0.01); gentler than a
+                                     # camera so a turn eases in naturally instead of feeling like a brake
     self.tmap_ahead_is_bump = False
     # carrot-style odometry smoothing: TMAP sends distances ~1Hz; fill in between updates with
     # v_ego*dt so the deceleration distance counts down smoothly at the planner rate.
@@ -121,6 +123,7 @@ class SpeedLimitResolver:
         self.tmap_ctrl_end = float(self.params.get("AutoNaviSpeedCtrlEnd", return_default=True))
         self.tmap_bump_time = float(self.params.get("AutoNaviSpeedBumpTime", return_default=True))
         self.tmap_turn_end = float(self.params.get("AutoTurnControlTurnEnd", return_default=True))
+        self.tmap_turn_decel_rate = max(0.1, self.params.get("AutoTurnControlDecelRate", return_default=True) * 0.01)
 
   def _get_speed_limit_offset(self) -> float:
     if self.offset_type == OffsetType.off:
