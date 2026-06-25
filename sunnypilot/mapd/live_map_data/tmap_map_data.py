@@ -370,9 +370,13 @@ class TmapMapData(BaseMapData):
         # while a speed camera is ahead and clears to 0 after passing. Exclude speed bumps
         # (xSpdType 22) so only camera warnings light up the dash.
         cluster_limit = int(round(self.xSpdLimit)) if (self.xSpdLimit > 0 and self.xSpdType != 22) else 0
+        # speed-bump pass speed (kph), only while a bump is the active event -> shown on the dash
+        # as a separate predictive "ahead" event (ACC_Events 4), distinct from the camera sign.
+        bump_limit = int(round(self.xSpdLimit)) if (self.xSpdLimit > 0 and self.xSpdType == 22) else 0
       else:
         status = "No data - check phone app / network"
         cluster_limit = 0
+        bump_limit = 0
     self.params.put("TmapStatus", status)
     # Camera speed limit (kph) for the MEB cluster (ACC_Tempolimit): appears at a speed
     # camera and disappears after passing -- mirrors the camera-centric onroad UI.
@@ -382,3 +386,7 @@ class TmapMapData(BaseMapData):
     # a curve-deceleration event, distinct from the speed-camera sign (carstate injects this into
     # cruiseState.speedLimitPredicative with type=curve).
     self.params.put("TmapTurnSpeed", int(round(turn_speed * CV.MS_TO_KPH)) if turn_speed > 0 else 0)
+    # tjddyd: speed-bump pass speed (kph) for the MEB cluster predictive "speed limit ahead" event
+    # (ACC_Events 4). Non-zero while a bump is ahead; clears after. carstate injects it into
+    # cruiseState.speedLimitPredicative with type=speed-limit so the dash shows a distinct event.
+    self.params.put("TmapBumpSpeed", bump_limit)
