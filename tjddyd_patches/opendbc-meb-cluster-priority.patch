@@ -1,0 +1,45 @@
+From 08f90a0411fc851f151be91a855eec6d5eb1b338 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 25 Jun 2026 05:24:20 +0000
+Subject: [PATCH] VW MEB: cluster alert priority camera > bump > curve
+
+When multiple TMAP events overlap, prefer the more safety-relevant cluster
+alert: a speed bump (speed-limit-ahead event) now takes priority over a curve
+event, and the camera sign still overrides both. Display-only; speed control
+is unchanged (the planner still slows for whichever event needs it).
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_015XiGYrFo4VxceB8UKz4mPV
+---
+ opendbc/car/volkswagen/carstate.py | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
+
+diff --git a/opendbc/car/volkswagen/carstate.py b/opendbc/car/volkswagen/carstate.py
+index de489136..32a09cac 100644
+--- a/opendbc/car/volkswagen/carstate.py
++++ b/opendbc/car/volkswagen/carstate.py
+@@ -424,14 +424,16 @@ class CarState(CarStateBase, MadsCarState):
+         except Exception:
+           self._tmap_turn_speed = 0.
+           self._tmap_bump_speed = 0.
+-      # only inject when no camera limit is active (camera sign keeps priority); turn wins over bump
++      # only inject when no camera limit is active (camera sign keeps top priority).
++      # Among predictive events the order is: bump (speed-limit-ahead) over curve, per request.
++      # Net cluster alert priority: camera > bump > curve.
+       if ret.cruiseState.speedLimit == 0:
+-        if self._tmap_turn_speed > 0:
+-          ret.cruiseState.speedLimitPredicative = self._tmap_turn_speed
+-          self.speed_limit_predicative_type = PSD_TYPE_CURV_SPEED
+-        elif self._tmap_bump_speed > 0:
++        if self._tmap_bump_speed > 0:
+           ret.cruiseState.speedLimitPredicative = self._tmap_bump_speed
+           self.speed_limit_predicative_type = PSD_TYPE_SPEED_LIMIT  # -> ACC_Events 4 (ahead)
++        elif self._tmap_turn_speed > 0:
++          ret.cruiseState.speedLimitPredicative = self._tmap_turn_speed
++          self.speed_limit_predicative_type = PSD_TYPE_CURV_SPEED
+ 
+     ret_sp.speedLimit = ret.cruiseState.speedLimit
+     # tjddyd VW MEB opt-in: cruise stalk 2nd detent (big step). 1 = Tip_Stufe_2.
+-- 
+2.43.0
+
