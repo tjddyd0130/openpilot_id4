@@ -399,13 +399,13 @@ class TmapMapData(BaseMapData):
     # Camera speed limit (kph) for the MEB cluster (ACC_Tempolimit): appears at a speed
     # camera and disappears after passing -- mirrors the camera-centric onroad UI.
     self.params.put("TmapRoadLimit", cluster_limit)
-    # tjddyd: a nav TBT turn is an intersection (left/right/u-turn), NOT a road curve, so it does
-    # NOT drive the cluster CURVE event -- the dash curve glyph is reserved for real curves, which
-    # the SCC-Vision controller detects and surfaces via the TmapCurveSpeed param (written by the
-    # planner). TBT turns still slow the car (planner turn channel); they just show nothing on the
-    # cluster. Keep the param cleared so a stale value never lights the dash.
-    self.params.put("TmapTurnSpeed", 0)
-    # tjddyd: speed-bump pass speed (kph) for the MEB cluster predictive "speed limit ahead" event
-    # (ACC_Events 4). Non-zero while a bump is ahead; clears after. carstate injects it into
-    # cruiseState.speedLimitPredicative with type=speed-limit so the dash shows a distinct event.
-    self.params.put("TmapBumpSpeed", bump_limit)
+    # tjddyd: nav TBT turn / intersection target speed (kph) for the MEB cluster INTERSECTION event
+    # (ACC_Events 9). Non-zero while the turn controller is slowing for a left/right/u-turn (already
+    # within the start-distance gate); clears to 0 otherwise. A turn is an intersection, NOT a road
+    # curve -- the curve glyph (event 6) is reserved for SCC-Vision (TmapCurveSpeed). carstate
+    # injects this into cruiseState.speedLimitPredicative with type=turn.
+    self.params.put("TmapTurnSpeed", int(round(turn_speed * CV.MS_TO_KPH)) if turn_speed > 0 else 0)
+    # tjddyd: speed bumps intentionally show NOTHING on the cluster -- the bump event rendered like
+    # a posted speed-limit sign (e.g. "30"), which is confusing. The planner still slows for bumps
+    # (bump channel); only the dash display is suppressed (carstate no longer reads TmapBumpSpeed).
+    self.params.put("TmapBumpSpeed", 0)
