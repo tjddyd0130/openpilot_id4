@@ -405,7 +405,5 @@ class TmapMapData(BaseMapData):
     # curve -- the curve glyph (event 6) is reserved for SCC-Vision (TmapCurveSpeed). carstate
     # injects this into cruiseState.speedLimitPredicative with type=turn.
     self.params.put("TmapTurnSpeed", int(round(turn_speed * CV.MS_TO_KPH)) if turn_speed > 0 else 0)
-    # tjddyd: speed bumps intentionally show NOTHING on the cluster -- the bump event rendered like
-    # a posted speed-limit sign (e.g. "30"), which is confusing. The planner still slows for bumps
-    # (bump channel); only the dash display is suppressed (carstate no longer reads TmapBumpSpeed).
-    self.params.put("TmapBumpSpeed", 0)
+    # tjddyd: the speed-bump cluster value (TmapBumpSpeed) is now written by the planner as a live
+    # decel target (km/h), not here -- mapd only knows the static bump speed, not the live ramp.

@@ -310,6 +310,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"TmapTurnSpeed", {CLEAR_ON_MANAGER_START, INT, "0"}},
     {"TmapBumpSpeed", {CLEAR_ON_MANAGER_START, INT, "0"}},
     {"TmapCurveSpeed", {CLEAR_ON_MANAGER_START, INT, "0"}},
+    {"TmapCameraSpeed", {CLEAR_ON_MANAGER_START, INT, "0"}},
     {"AutoNaviSpeedCtrlEnd", {PERSISTENT | BACKUP, INT, "7"}},
     {"AutoNaviSpeedCtrlMode", {PERSISTENT | BACKUP, INT, "2"}},
     {"AutoRoadSpeedLimitOffset", {PERSISTENT | BACKUP, INT, "-1"}},
@@ -325,4 +326,5 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"AutoTurnControlStartDist", {PERSISTENT | BACKUP, INT, "60"}},
     {"AutoNaviSpeedBumpDecelRate", {PERSISTENT | BACKUP, INT, "200"}},
     {"MebStopDistance", {PERSISTENT | BACKUP, INT, "45"}},
+    {"BumpClusterEvent", {PERSISTENT | BACKUP, INT, "7"}},
 };

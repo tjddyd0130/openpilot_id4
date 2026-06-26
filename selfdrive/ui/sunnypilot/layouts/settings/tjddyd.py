@@ -59,6 +59,10 @@ TMAP_OPTIONS = [
    "How close to an actual turn before slowing begins (carrot atc_start_dist). Smaller = starts "
    "later / nearer the turn (no more braking from far away); larger = starts earlier. "
    "Forks/rotaries start farther out automatically, scaled by the road limit.", 30, 200, 10),
+  ("BumpClusterEvent", "Bump cluster glyph (ACC_Events code)",
+   "Which cluster event icon a speed bump uses (no speed-limit sign, just the icon + live decel "
+   "km/h). The icon for each code is not documented, so try values on the road to find one that is "
+   "not confusing. Known: 5=camera sign, 6=curve, 9=intersection. 0 = no bump display.", 0, 15, 1),
 ]
 
 # Description constants (English)

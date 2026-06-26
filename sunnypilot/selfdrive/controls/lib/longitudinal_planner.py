@@ -45,6 +45,9 @@ class LongitudinalPlannerSP:
     self.params = Params()
     self.is_meb = CP.brand == "volkswagen" and bool(CP.flags & VolkswagenFlags.MEB)
     self._curve_cluster_kph_last = -1
+    # tjddyd: live camera / speed-bump target speeds surfaced to the cluster Event_Wunschgeschw
+    self._cam_cluster_kph_last = -1
+    self._bump_cluster_kph_last = -1
 
     # tjddyd: speed the driver reached by pressing the gas while we were slowing for a speed
     # bump. Once captured it becomes the bump pass speed for the rest of that bump event, so we
@@ -106,6 +109,8 @@ class LongitudinalPlannerSP:
     # high when far (no effect -- cruise wins the min) and falls to the limit as you approach;
     # it auto-releases once the event clears (resolver.speed_limit -> 0), restoring set speed.
     # Gated on EnableTmapSpeedLimit (off by default), so every other configuration is unaffected.
+    cam_live = 0.   # tjddyd: live camera target (m/s) for the cluster Event_Wunschgeschw (0 = none)
+    bump_live = 0.  # tjddyd: live speed-bump target (m/s) for the cluster Event_Wunschgeschw (0 = none)
     if self.resolver.use_tmap:
       tmap_target = self.sla.output_v_target  # base: no tmap event -> assist's own (unset)
       # camera / section / bump (sign-bearing event)
@@ -128,7 +133,15 @@ class LongitudinalPlannerSP:
           end_s = self.resolver.tmap_ctrl_end
           decel_rate = self.resolver.tmap_decel_rate
         dd = max(0., self.resolver.distance - v_limit * end_s)
-        tmap_target = min(tmap_target, max(v_limit, (v_limit ** 2 + 2.0 * decel_rate * dd) ** 0.5))
+        event_ramp = max(v_limit, (v_limit ** 2 + 2.0 * decel_rate * dd) ** 0.5)
+        tmap_target = min(tmap_target, event_ramp)
+        # tjddyd: live target shown on the cluster (carrot desiredSpeed style) -- clamp to the set
+        # speed so it reads set-speed when far and eases down to the limit as you approach.
+        live = min(event_ramp, v_cruise)
+        if bump_active:
+          bump_live = live
+        else:
+          cam_live = live
       # turn / intersection (separate TBT channel, so it never shows as a speed-limit sign).
       # Uses the resolver's odometry-smoothed turn speed/distance.
       if self.resolver.tmap_turn_speed > 0.:
@@ -136,6 +149,19 @@ class LongitudinalPlannerSP:
         dd = max(0., self.resolver.tmap_turn_dist - v_turn * self.resolver.tmap_turn_end)
         tmap_target = min(tmap_target, max(v_turn, (v_turn ** 2 + 2.0 * self.resolver.tmap_turn_decel_rate * dd) ** 0.5))
       targets[LongitudinalPlanSource.speedLimitAssist] = (tmap_target, a_ego)
+
+    # tjddyd: surface the live camera / speed-bump targets to the MEB cluster (Event_Wunschgeschw).
+    # carcontroller shows them as a live km/h that eases down to the limit as you approach. Written
+    # on-change (kph); 0 clears. MEB-gated so other cars are untouched.
+    if self.is_meb:
+      cam_kph = max(0, min(250, int(round(cam_live)))) if cam_live > 0. else 0
+      if cam_kph != self._cam_cluster_kph_last:
+        self.params.put("TmapCameraSpeed", cam_kph)
+        self._cam_cluster_kph_last = cam_kph
+      bump_kph = max(0, min(250, int(round(bump_live)))) if bump_live > 0. else 0
+      if bump_kph != self._bump_cluster_kph_last:
+        self.params.put("TmapBumpSpeed", bump_kph)
+        self._bump_cluster_kph_last = bump_kph
 
     self.source = min(targets, key=lambda k: targets[k][0])
     self.output_v_target, self.output_a_target = targets[self.source]
