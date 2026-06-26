@@ -25,13 +25,13 @@ Claude-Session: https://claude.ai/code/session_015XiGYrFo4VxceB8UKz4mPV
  3 files changed, 25 insertions(+), 3 deletions(-)
 
 diff --git a/opendbc/car/volkswagen/carcontroller.py b/opendbc/car/volkswagen/carcontroller.py
-index 2021dff..86e68ad 100644
+index 39d8cbb..7ac76e4 100644
 --- a/opendbc/car/volkswagen/carcontroller.py
 +++ b/opendbc/car/volkswagen/carcontroller.py
 @@ -6,6 +6,17 @@ class CarController(CarControllerBase, IntelligentCruiseButtonManagementInterfac
-           
+ 
          acc_hud_event = self.CCS.acc_hud_event(acc_hud_status, CS.esp_hold_confirmation, sl_predicative_active, CS.speed_limit_predicative_type, sl_active)
-           
+ 
 +        # tjddyd: live event speed shown in ACC_Event_Wunschgeschw, separate from the speed-limit
 +        # sign (ACC_Tempolimit). Camera: keep the sign at the recognised limit, show the live ramp
 +        # km/h by the glyph. Speed bump: no sign, use the configurable BumpClusterEvent glyph + the
