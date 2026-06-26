@@ -168,15 +168,18 @@ class LongitudinalPlannerSP:
     return self.output_v_target, self.output_a_target
 
   def _tmap_event_accel(self, v_ego: float, v_target: float, distance: float, end_s: float, decel_rate: float) -> float:
-    # carrot curve's implied (constant) deceleration to reach v_target at the carrot margin point.
-    # It self-eases to 0 as v_ego -> v_target and steepens if we are behind the curve, but is
-    # capped at the configured decel rate so the slowdown stays smooth (the rate setting controls
-    # firmness instead of slamming to the comfort floor). TMAP_DECEL_ACCEL_FLOOR is a safety bound.
+    # carrot-style: only command a decel once we are actually BEHIND the kinematic ramp, i.e. going
+    # faster than the speed from which decel_rate would just reach v_target by the margin point.
+    # While still on/under the ramp (far away) we command nothing and let the v_target cap + MPC
+    # coast -- otherwise (v_target^2 - v_ego^2)/(2*decel_dist) spreads a gentle decel over the whole
+    # distance and starts braking from way too far out (e.g. 300 m before a 30 km/h camera).
     if v_ego <= v_target + 0.1:
       return 0.0  # no decel needed
     decel_dist = max(1.0, distance - v_target * end_s)
-    a_carrot = (v_target ** 2 - v_ego ** 2) / (2.0 * decel_dist)
-    return max(a_carrot, -decel_rate, TMAP_DECEL_ACCEL_FLOOR)
+    ramp = (v_target ** 2 + 2.0 * decel_rate * decel_dist) ** 0.5  # max speed allowed at this distance
+    if v_ego <= ramp:
+      return 0.0  # still within the carrot budget -- don't brake yet
+    return max(-decel_rate, TMAP_DECEL_ACCEL_FLOOR)
 
   def tmap_decel_accel(self, v_ego: float, a_target: float) -> float:
     # Command the carrot-curve deceleration for whichever TMAP event is ahead so if2's MPC follows
