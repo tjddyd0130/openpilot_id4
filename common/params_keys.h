@@ -327,4 +327,6 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"AutoNaviSpeedBumpDecelRate", {PERSISTENT | BACKUP, INT, "200"}},
     {"MebStopDistance", {PERSISTENT | BACKUP, INT, "45"}},
     {"BumpClusterEvent", {PERSISTENT | BACKUP, INT, "7"}},
+    {"AlertVolume", {PERSISTENT | BACKUP, INT, "100"}},
+    {"DisableClusterFcw", {PERSISTENT | BACKUP, BOOL, "0"}},
 };

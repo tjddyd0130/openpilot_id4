@@ -124,7 +124,7 @@ class Soundd(QuietMode):
         written_frames += frames_to_write
         self.current_sound_frame += frames_to_write
 
-    return ret * self.current_volume
+    return ret * self.current_volume * self.volume_scale
 
   def callback(self, data_out: np.ndarray, frames: int, time, status) -> None:
     if status:

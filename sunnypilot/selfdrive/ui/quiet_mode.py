@@ -22,12 +22,22 @@ class QuietMode:
   def __init__(self):
     self.params = Params()
     self.enabled: bool = self.params.get_bool("QuietMode")
+    # tjddyd: overall alert-volume scale (0.3 - 1.0); user lowers it when alerts are too loud.
+    # Floored at 0.3 so safety alerts (e.g. FCW) stay audible.
+    self.volume_scale: float = self._read_volume_scale()
     self._frame = 0
+
+  def _read_volume_scale(self) -> float:
+    try:
+      return min(1.0, max(0.3, self.params.get("AlertVolume", return_default=True) * 0.01))
+    except Exception:
+      return 1.0
 
   def load_param(self) -> None:
     self._frame += 1
     if self._frame % 50 == 0:  # 2.5 seconds
       self.enabled = self.params.get_bool("QuietMode")
+      self.volume_scale = self._read_volume_scale()
 
   def should_play_sound(self, current_alert: int) -> bool:
     """

@@ -63,6 +63,12 @@ TMAP_OPTIONS = [
    "Which cluster event icon a speed bump uses (no speed-limit sign, just the icon + live decel "
    "km/h). The icon for each code is not documented, so try values on the road to find one that is "
    "not confusing. Known: 5=camera sign, 6=curve, 9=intersection. 0 = no bump display.", 0, 15, 1),
+  ("AlertVolume", "openpilot alert volume (%)",
+   "Overall openpilot alert sound volume. Lower if alerts are too loud. Floored at 30% so safety "
+   "alerts (e.g. forward-collision warning) stay audible.", 30, 100, 5),
+  ("DisableClusterFcw", "VW MEB: hide cluster collision warning",
+   "VW MEB only: when the lead gets close, do not show the red collision warning on the instrument "
+   "cluster (and its beep). openpilot still shows its own on-screen warning. 0: show  1: hide.", 0, 1, 1),
 ]
 
 # Description constants (English)

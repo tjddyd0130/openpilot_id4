@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-# tjddyd: reorder MEB cluster ACC_Events priority to camera > bump > curve/turn > ACC-standby.
+# tjddyd: (1) reorder MEB cluster ACC_Events priority to camera > bump > curve/turn > ACC-standby,
+# and (2) let DisableClusterFcw hide the cluster forward-collision warning (red symbol + beep).
 # Run from the opendbc repo root, then commit. Idempotent (skips if already applied).
 import sys
 
@@ -63,6 +64,26 @@ edit(D + "carcontroller.py", [
    "          event_speed = CS._tmap_bump_speed\n"
    "          speed_limit = 0\n",
    "cluster event priority camera > bump > curve/turn > ACC-standby"),
+])
+
+# 3) carstate: read the DisableClusterFcw param (BOOL).
+edit(D + "carstate.py", [
+  ("    self._bump_cluster_event = 0\n    self.force_rhd_for_bsm = False",
+   "    self._bump_cluster_event = 0\n"
+   "    self._disable_cluster_fcw = False  # tjddyd: hide the MEB cluster forward-collision warning\n"
+   "    self.force_rhd_for_bsm = False",
+   "self._disable_cluster_fcw = False  # tjddyd"),
+  ('          self._bump_cluster_event = int(self._tmap_params.get("BumpClusterEvent", return_default=True))\n',
+   '          self._bump_cluster_event = int(self._tmap_params.get("BumpClusterEvent", return_default=True))\n'
+   '          self._disable_cluster_fcw = self._tmap_params.get_bool("DisableClusterFcw")\n',
+   'get_bool("DisableClusterFcw")'),
+])
+
+# 4) carcontroller: gate the cluster FCW on the param (openpilot still shows its own on-screen FCW).
+edit(D + "carcontroller.py", [
+  ("gap, fcw_alert, acc_hud_event, speed_limit, event_speed))",
+   "gap, (fcw_alert and not CS._disable_cluster_fcw), acc_hud_event, speed_limit, event_speed))",
+   "fcw_alert and not CS._disable_cluster_fcw"),
 ])
 
 print("done")
