@@ -127,6 +127,14 @@ class TjddydLayout(Widget):
 
     # param, title, desc, icon
     self._toggle_defs = {
+      "AirConditioner": (
+        lambda: tr("VW MEB: A/C temp & pressure (onroad)"),
+        tr_noop(
+          "VW MEB only: show A/C refrigerant pressure (bar) and DC-DC temperature "
+          "(used as outlet temp) above the driver monitor while driving."
+        ),
+        "speed_limit.png",
+      ),
       "DisableDM": (
         lambda: tr("Driver monitoring OFF (own risk)"),
         DESCRIPTIONS["DisableDM"],
