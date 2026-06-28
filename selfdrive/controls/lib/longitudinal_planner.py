@@ -201,10 +201,9 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
       output_a_target = output_a_target_mpc
       self.output_should_stop = output_should_stop_mpc
 
-    # tjddyd: carrot-style -- TMAP camera/bump/turn deceleration is now handled purely by the
-    # v_cruise cap (update_targets) + the jerk-optimizing MPC, exactly like carrot. The old raw
-    # fixed-decel injection (tmap_decel_accel) bypassed the MPC and caused a step/grab plus a
-    # sub-target overshoot, so it is removed.
+    # tjddyd: tighten deceleration to the carrot curve for TMAP cameras/bumps (TMAP-gated no-op otherwise)
+    output_a_target = LongitudinalPlannerSP.tmap_decel_accel(self, v_ego, output_a_target)
+
     for idx in range(2):
       accel_clip[idx] = np.clip(accel_clip[idx], self.prev_accel_clip[idx] - 0.05, self.prev_accel_clip[idx] + 0.05)
     self.output_a_target = np.clip(output_a_target, accel_clip[0], accel_clip[1])
