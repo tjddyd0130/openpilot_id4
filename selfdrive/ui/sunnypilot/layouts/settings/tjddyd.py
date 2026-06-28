@@ -66,9 +66,6 @@ TMAP_OPTIONS = [
   ("AlertVolume", "openpilot alert volume (%)",
    "Overall openpilot alert sound volume. Lower if alerts are too loud. Floored at 30% so safety "
    "alerts (e.g. forward-collision warning) stay audible.", 30, 100, 5),
-  ("DisableClusterFcw", "VW MEB: hide cluster collision warning",
-   "VW MEB only: when the lead gets close, do not show the red collision warning on the instrument "
-   "cluster (and its beep). openpilot still shows its own on-screen warning. 0: show  1: hide.", 0, 1, 1),
 ]
 
 # Description constants (English)
@@ -115,6 +112,11 @@ DESCRIPTIONS = {
     "effect without a rebuild once the new solver is built. Lower = stops closer; this is the "
     "rear-end safety margin, so keep it sensible (min 3.0 m). Requires openpilot longitudinal."
   ),
+  "DisableClusterFcw": tr_noop(
+    "VW MEB only: when the lead gets close, do not show the red collision warning on the "
+    "instrument cluster (and its beep). openpilot still shows its own on-screen warning. "
+    "Requires the opendbc cluster change."
+  ),
 }
 
 
@@ -158,6 +160,11 @@ class TjddydLayout(Widget):
       "EnableTmapSpeedLimit": (
         lambda: tr("T map / KakaoNavi speed limit (:7713)"),
         DESCRIPTIONS["EnableTmapSpeedLimit"],
+        "speed_limit.png",
+      ),
+      "DisableClusterFcw": (
+        lambda: tr("VW MEB: hide cluster collision warning"),
+        DESCRIPTIONS["DisableClusterFcw"],
         "speed_limit.png",
       ),
     }
