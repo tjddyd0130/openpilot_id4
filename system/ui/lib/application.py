@@ -110,11 +110,10 @@ class FontWeight(StrEnum):
   DISPLAY = "Inter-Bold.fnt"
 
 
-def font_fallback(font: rl.Font) -> rl.Font:
-  """Fall back to unifont for languages that require it."""
-  if multilang.requires_unifont():
-    return gui_app.font(FontWeight.UNIFONT)
-  return font
+def font_fallback(font: rl.Font, text: str = "") -> rl.Font:
+  """Pick Inter, Noto Sans KR (ko / Hangul), or unifont (other CJK) for text."""
+  from openpilot.system.ui.lib.korean_font import font_for_text
+  return font_for_text(font, text)
 
 
 class MousePos(NamedTuple):
@@ -715,7 +714,7 @@ class GuiApplication(GuiApplicationExt):
       rl._orig_draw_text_ex = rl.draw_text_ex
 
     def _draw_text_ex_scaled(font, text, position, font_size, spacing, tint):
-      font = font_fallback(font)
+      font = font_fallback(font, text)
       return rl._orig_draw_text_ex(font, text, position, font_size * FONT_SCALE, spacing, tint)
 
     rl.draw_text_ex = _draw_text_ex_scaled

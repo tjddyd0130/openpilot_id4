@@ -19,7 +19,6 @@ UNIFONT_LANGUAGES = [
   "th",
   "zh-CHT",
   "zh-CHS",
-  "ko",
   "ja",
 ]
 
@@ -164,6 +163,10 @@ class Multilang:
   def requires_unifont(self) -> bool:
     """Certain languages require unifont to render their glyphs."""
     return self._language in UNIFONT_LANGUAGES
+
+  def requires_korean_font(self) -> bool:
+    """Korean UI uses Noto Sans KR instead of the 16px unifont bitmap."""
+    return self._language == "ko"
 
   def setup(self):
     try:
