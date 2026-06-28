@@ -18,6 +18,10 @@ class RoadNameRenderer(Widget):
     self.road_name = ""
     self.is_metric = False
     self.font_demi = gui_app.font(FontWeight.SEMI_BOLD)
+    # tjddyd: road names from TMAP are Korean. draw_text_ex only falls back to unifont
+    # when the UI *language* is Korean, so pick unifont ourselves whenever the name has
+    # any non-ASCII (Hangul) char -- otherwise Inter has no glyph and it breaks into boxes.
+    self.font_unifont = gui_app.font(FontWeight.UNIFONT)
 
   def update(self):
     sm = ui_state.sm
@@ -35,7 +39,8 @@ class RoadNameRenderer(Widget):
       return
 
     text = self.road_name
-    text_size = measure_text_cached(self.font_demi, text, 46)
+    font = self.font_unifont if any(ord(c) > 0x7F for c in text) else self.font_demi
+    text_size = measure_text_cached(font, text, 46)
 
     padding = 40
     rect_width = max(200, min(text_size.x + padding, rect.width - 40))
@@ -48,9 +53,9 @@ class RoadNameRenderer(Widget):
     if text_size.x > max_text_width:
       while text_size.x > max_text_width and len(text) > 3:
         text = text[:-1]
-        text_size = measure_text_cached(self.font_demi, text + "...", 46)
+        text_size = measure_text_cached(font, text + "...", 46)
       text = text + "..."
 
-    sz = measure_text_cached(self.font_demi, text, 46)
+    sz = measure_text_cached(font, text, 46)
     origin = rl.Vector2(road_rect.x + road_rect.width / 2 - sz.x / 2, road_rect.y + road_rect.height / 2 - sz.y / 2)
-    rl.draw_text_ex(self.font_demi, text, origin, 46, 0, rl.Color(255, 255, 255, 200))
+    rl.draw_text_ex(font, text, origin, 46, 0, rl.Color(255, 255, 255, 200))

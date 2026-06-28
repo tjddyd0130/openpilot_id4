@@ -13,6 +13,15 @@ GLYPH_PADDING = 6
 EXTRA_CHARS = "–‑✓×°§•X⚙✕◀▶✔⌫⇧␣○●↳çêüñ–‑✓×°§•€£¥"
 UNIFONT_LANGUAGES = {"th", "zh-CHT", "zh-CHS", "ko", "ja"}
 
+# tjddyd: bake the full modern Hangul block into unifont so arbitrary Korean text
+# (e.g. TMAP road names like "내부순환로") renders instead of breaking into boxes.
+# The translation .po only covers the strings it contains, never live map text.
+UNIFONT_EXTRA_RANGES = (
+  (0xAC00, 0xD7A3),  # Hangul Syllables (11,172 modern syllables)
+  (0x1100, 0x11FF),  # Hangul Jamo
+  (0x3130, 0x318F),  # Hangul Compatibility Jamo
+)
+
 
 def _languages():
   if not LANGUAGES_FILE.exists():
@@ -33,6 +42,10 @@ def _char_sets():
     except FileNotFoundError:
       continue
     (unifont if code in UNIFONT_LANGUAGES else base).update(chars)
+
+  # tjddyd: ensure unifont covers every Hangul codepoint, not just translated strings.
+  for lo, hi in UNIFONT_EXTRA_RANGES:
+    unifont.update(map(chr, range(lo, hi + 1)))
 
   return tuple(sorted(ord(c) for c in base)), tuple(sorted(ord(c) for c in unifont))
 
