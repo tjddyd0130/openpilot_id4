@@ -5,14 +5,9 @@ env:
   LFS_PUSH_URL: 'ssh://git@gitlab.com/sunnypilot/public/sunnypilot-new-lfs.git'
 
 on:
-  schedule:
-    - cron: '0 0 * * *'  # Runs at 00:00 UTC every day
-  push:
-    branches:
-      - 'master'
-  pull_request:
-    branches:
-      - 'master'
+  # tjddyd: auto-triggers (schedule/push/pull_request) disabled -- this syncs LFS to
+  # sunnypilot's GitLab and needs secrets.SSH_PRIVATE_KEY, which this fork doesn't have,
+  # so it only ever failed and spammed failure emails. Manual dispatch kept for completeness.
   workflow_dispatch: # enables manual triggering
     inputs:
       upstream_branch:
