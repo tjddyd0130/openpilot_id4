@@ -866,3 +866,7 @@ msgstr "✓ 구독됨"
 msgid "🔥 Firehose Mode 🔥"
 msgstr "🔥 파이어호스 모드 🔥"
 
+
+#: openpilot/selfdrive/ui/sunnypilot/layouts/settings/settings.py
+msgid "Korea"
+msgstr "한국"
