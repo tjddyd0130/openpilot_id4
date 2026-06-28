@@ -302,6 +302,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"AutoGasSyncSpeed", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"EnableStalkBigStep", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"EnableWebTerminal", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"AirConditioner", {PERSISTENT | BACKUP, BOOL, "0"}},
 
     // tjddyd Phase 2: TMAP/KakaoNavi speed-limit + speed-camera (carrot AutoNavi params)
     {"EnableTmapSpeedLimit", {PERSISTENT | BACKUP, BOOL, "0"}},
