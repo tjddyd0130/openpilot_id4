@@ -7,7 +7,7 @@ See the LICENSE.md file in the root directory for more details.
 import pyray as rl
 
 from openpilot.selfdrive.ui.ui_state import ui_state
-from openpilot.system.ui.lib.application import gui_app, FontWeight
+from openpilot.system.ui.lib.application import gui_app, FontWeight, font_fallback
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.widgets import Widget
 
@@ -18,10 +18,6 @@ class RoadNameRenderer(Widget):
     self.road_name = ""
     self.is_metric = False
     self.font_demi = gui_app.font(FontWeight.SEMI_BOLD)
-    # tjddyd: road names from TMAP are Korean. draw_text_ex only falls back to unifont
-    # when the UI *language* is Korean, so pick unifont ourselves whenever the name has
-    # any non-ASCII (Hangul) char -- otherwise Inter has no glyph and it breaks into boxes.
-    self.font_unifont = gui_app.font(FontWeight.UNIFONT)
 
   def update(self):
     sm = ui_state.sm
@@ -39,7 +35,7 @@ class RoadNameRenderer(Widget):
       return
 
     text = self.road_name
-    font = self.font_unifont if any(ord(c) > 0x7F for c in text) else self.font_demi
+    font = font_fallback(self.font_demi, text)
     text_size = measure_text_cached(font, text, 46)
 
     padding = 40
