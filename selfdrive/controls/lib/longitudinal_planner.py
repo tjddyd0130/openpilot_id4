@@ -79,7 +79,7 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
     self.j_desired_trajectory = np.zeros(CONTROL_N)
 
     # tjddyd VW MEB opt-in: low-speed close-follow + tunable standstill distance.
-    # Both gated to VW MEB; non-MEB keeps stock behaviour.
+    # Both gated to VW MEB; non-MEB keeps stock behavior.
     self.params = Params()
     self._frame = 0
     self.is_meb = self.CP.brand == "volkswagen" and bool(self.CP.flags & VolkswagenFlags.MEB)

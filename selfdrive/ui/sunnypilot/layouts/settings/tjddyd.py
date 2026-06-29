@@ -1,7 +1,7 @@
 """
 Korea (tjddyd) VW ID.4 (MEB) opt-in convenience features.
 
-These toggles only expose params. The runtime behaviour is gated to
+These toggles only expose params. The runtime behavior is gated to
 VW MEB (CP.brand == 'volkswagen' and CP.flags & VolkswagenFlags.MEB) in the
 controls code, so enabling them has no effect on other platforms.
 

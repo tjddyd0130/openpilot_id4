@@ -108,7 +108,7 @@ class TmapMapData(BaseMapData):
     self._lock = threading.Lock()
     self._last_rx = 0.0
 
-    # parsed navigation state (kph / metres)
+    # parsed navigation state (kph / meters)
     self.nRoadLimitSpeed = 0
     self.xSpdLimit = 0
     self.xSpdDist = 0

@@ -227,7 +227,7 @@ class LongitudinalMpc:
     self.source = LongitudinalPlanSource.cruise
     # tjddyd VW MEB opt-in: standstill stopping distance (m), now a runtime solver parameter
     # (carrot-style) so it is tunable live without a rebuild. The planner sets it from a param on
-    # MEB; default stays the stock 6.0 so non-MEB behaviour is unchanged.
+    # MEB; default stays the stock 6.0 so non-MEB behavior is unchanged.
     self.stop_distance = STOP_DISTANCE
 
   def reset(self):

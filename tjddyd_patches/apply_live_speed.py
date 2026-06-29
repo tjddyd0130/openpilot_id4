@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # tjddyd: apply the "live camera/bump target km/h on the cluster" change directly (string
 # replacement) instead of a git patch -- the carcontroller has whitespace-only blank lines that
 # break `git am`. Run from the opendbc repo root, then commit. Idempotent (skips if already done).
@@ -23,7 +22,7 @@ def edit(path, repls):
 
 CC_INS = (
   "        # tjddyd: live event speed shown in ACC_Event_Wunschgeschw, separate from the speed-limit\n"
-  "        # sign (ACC_Tempolimit). Camera: keep the sign at the recognised limit, show the live ramp\n"
+  "        # sign (ACC_Tempolimit). Camera: keep the sign at the recognized limit, show the live ramp\n"
   "        # km/h by the glyph. Speed bump: no sign, use the configurable BumpClusterEvent glyph + the\n"
   "        # live bump decel km/h. carcontroller display only; never caps speed.\n"
   "        event_speed = None\n"

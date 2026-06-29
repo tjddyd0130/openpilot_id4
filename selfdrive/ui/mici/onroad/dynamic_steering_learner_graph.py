@@ -101,7 +101,7 @@ class DynamicSteeringLearnerGraphMici(Widget):
       self._cached_min_y, self._cached_max_y = self._compute_y_bounds(self._cached_preview_curve, self._cached_fit_curve)
       self._cached_lcp_frame = lcp_frame
 
-    return self._cached_preview_curve, self._cached_fit_curve, self._cached_min_y, self._cached_max_y
+    return np.asarray(self._cached_preview_curve), np.asarray(self._cached_fit_curve), self._cached_min_y, self._cached_max_y
 
   def _render(self, rect: rl.Rectangle) -> None:
     if not self._display_enabled:

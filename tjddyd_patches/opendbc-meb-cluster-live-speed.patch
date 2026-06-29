@@ -5,7 +5,7 @@ Subject: [PATCH] VW MEB: live camera/bump target km/h on the cluster
 
 Show the live (carrot-style) deceleration target on the cluster, separate from
 the speed-limit sign:
-- Camera: keep ACC_Tempolimit at the recognised limit (the round sign) and show
+- Camera: keep ACC_Tempolimit at the recognized limit (the round sign) and show
   the live ramp km/h (eases set-speed -> limit as you approach) in
   ACC_Event_Wunschgeschw next to the camera glyph.
 - Speed bump: no sign at all; use a configurable ACC_Events glyph
@@ -33,7 +33,7 @@ index 39d8cbb..7ac76e4 100644
          acc_hud_event = self.CCS.acc_hud_event(acc_hud_status, CS.esp_hold_confirmation, sl_predicative_active, CS.speed_limit_predicative_type, sl_active)
  
 +        # tjddyd: live event speed shown in ACC_Event_Wunschgeschw, separate from the speed-limit
-+        # sign (ACC_Tempolimit). Camera: keep the sign at the recognised limit, show the live ramp
++        # sign (ACC_Tempolimit). Camera: keep the sign at the recognized limit, show the live ramp
 +        # km/h by the glyph. Speed bump: no sign, use the configurable BumpClusterEvent glyph + the
 +        # live bump decel km/h. carcontroller display only; never caps speed.
 +        event_speed = None
