@@ -228,7 +228,10 @@ class TestCurvatureDController:
     self._set_curve(msg, 3, {curvature_idx: 8e-6})
     controller.update_live_params(msg.liveCurvatureParameters)
 
-    v_ego = float(CurvatureDLookup.SPEED_ANCHORS[3])
+    # Align the base v_ego to the cache quantization grid (round() centers). The raw
+    # anchor (22.222 m/s) sits near a rounding boundary, so even half-a-step of noise
+    # would cross into the next bucket; a grid-aligned base keeps sub-step noise stable.
+    v_ego = round(float(CurvatureDLookup.SPEED_ANCHORS[3]), CACHE_V_EGO_DECIMALS)
 
     # Wrap the source to count calls
     call_count = {"n": 0}
@@ -251,15 +254,16 @@ class TestCurvatureDController:
         assert cached == first
       assert call_count["n"] == 1
 
-      # v_ego noise below quantization must still hit the cache
+      # v_ego noise below quantization must still hit the cache (0.4 step stays strictly
+      # inside the rounding bucket; exactly 0.5 lands on the tie boundary)
       v_ego_step = 10 ** -CACHE_V_EGO_DECIMALS
-      noised = controller.get_correction(32e-6, v_ego + v_ego_step * 0.5)
+      noised = controller.get_correction(32e-6, v_ego + v_ego_step * 0.4)
       assert noised == first
       assert call_count["n"] == 1
 
       # Curvature noise below quantization must still hit the cache
       curvature_step = 10 ** -CACHE_CURVATURE_DECIMALS
-      noised = controller.get_correction(32e-6 + curvature_step * 0.5, v_ego)
+      noised = controller.get_correction(32e-6 + curvature_step * 0.4, v_ego)
       assert noised == first
       assert call_count["n"] == 1
     finally:
