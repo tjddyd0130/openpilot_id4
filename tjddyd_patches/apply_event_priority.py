@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # tjddyd: (1) reorder MEB cluster ACC_Events priority to camera > bump > curve/turn > ACC-standby,
 # and (2) let DisableClusterFcw hide the cluster forward-collision warning (red symbol + beep).
 # Run from the opendbc repo root, then commit. Idempotent (skips if already applied).
@@ -45,7 +44,7 @@ edit(D + "mebcan.py", [
 #    bump override a curve/turn -> net priority camera > bump > curve/turn > ACC-standby.
 edit(D + "carcontroller.py", [
   ("        # tjddyd: live event speed shown in ACC_Event_Wunschgeschw, separate from the speed-limit\n"
-   "        # sign (ACC_Tempolimit). Camera: keep the sign at the recognised limit, show the live ramp\n"
+   "        # sign (ACC_Tempolimit). Camera: keep the sign at the recognized limit, show the live ramp\n"
    "        # km/h by the glyph. Speed bump: no sign, use the configurable BumpClusterEvent glyph + the\n"
    "        # live bump decel km/h. carcontroller display only; never caps speed.\n"
    "        event_speed = None\n"

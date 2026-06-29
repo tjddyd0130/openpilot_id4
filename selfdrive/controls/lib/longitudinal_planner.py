@@ -34,7 +34,7 @@ def get_max_accel(v_ego):
 
 def get_coast_accel(pitch):
   return np.sin(pitch) * -5.65 - 0.3  # fitted from data using xx/projects/allow_throttle/compute_coast_accel.py
-  
+
 
 def get_lead_distance(radarState):
   if radarState.leadOne.status and (not radarState.leadTwo.status or radarState.leadOne.dRel < radarState.leadTwo.dRel):
@@ -42,7 +42,7 @@ def get_lead_distance(radarState):
   if radarState.leadTwo.status:
     return radarState.leadTwo.dRel
   return 0
-  
+
 
 def limit_accel_in_turns(v_ego, angle_steers, a_target, CP):
   """
@@ -79,13 +79,21 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
     self.j_desired_trajectory = np.zeros(CONTROL_N)
 
     # tjddyd VW MEB opt-in: low-speed close-follow + tunable standstill distance.
-    # Both gated to VW MEB; non-MEB keeps stock behaviour.
+    # Both gated to VW MEB; non-MEB keeps stock behavior.
     self.params = Params()
     self._frame = 0
     self.is_meb = self.CP.brand == "volkswagen" and bool(self.CP.flags & VolkswagenFlags.MEB)
     self._update_meb_long_params()
 
   def _update_meb_long_params(self):
+    # Carrot-style TMAP deceleration toggle (default OFF). ON: camera/bump/turn slowdown is left
+    # entirely to the v_cruise cap + MPC. OFF: the prior fixed-decel injection is applied. Read
+    # unconditionally (the injection itself is a TMAP/MEB no-op otherwise).
+    self.enable_carrot_decel = self.params.get_bool("EnableCarrotDecel")
+    # carrot-style dynamic MPC tuning (opt-in, default OFF). Set on the MPC, which keeps the flags
+    # across solver resets. Not MEB-gated -- applies to any car running openpilot longitudinal.
+    self.mpc.enable_dynamic_jerk_cost = self.params.get_bool("EnableDynamicJerkCost")
+    self.mpc.enable_dynamic_t_follow = self.params.get_bool("EnableDynamicTFollow")
     # Standstill stopping distance: runtime solver parameter (carrot-style). On MEB read the
     # MebStopDistance param (units of 0.1 m), clamped to a safe 3.0-6.0 m. Non-MEB keeps stock.
     if self.is_meb:
@@ -201,8 +209,14 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
       output_a_target = output_a_target_mpc
       self.output_should_stop = output_should_stop_mpc
 
-    # tjddyd: tighten deceleration to the carrot curve for TMAP cameras/bumps (TMAP-gated no-op otherwise)
-    output_a_target = LongitudinalPlannerSP.tmap_decel_accel(self, v_ego, output_a_target)
+    # tjddyd: TMAP camera/bump/turn deceleration, gated by EnableCarrotDecel (default OFF).
+    #   ON  -> carrot-style: handled purely by the v_cruise cap (update_targets) + jerk-optimizing
+    #          MPC. Smoother, no step/grab/overshoot.
+    #   OFF -> prior behavior: inject the capped fixed decel (tmap_decel_accel) over the MPC output.
+    #          The injection bypasses the MPC and can step/grab, so this is the baseline for A/B.
+    # tmap_decel_accel is a TMAP/MEB no-op when no event is ahead, so this is safe on all platforms.
+    if not self.enable_carrot_decel:
+      output_a_target = LongitudinalPlannerSP.tmap_decel_accel(self, v_ego, output_a_target)
 
     for idx in range(2):
       accel_clip[idx] = np.clip(accel_clip[idx], self.prev_accel_clip[idx] - 0.05, self.prev_accel_clip[idx] + 0.05)

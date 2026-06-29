@@ -1,7 +1,7 @@
 """
 Korea (tjddyd) VW ID.4 (MEB) opt-in convenience features.
 
-These toggles only expose params. The runtime behaviour is gated to
+These toggles only expose params. The runtime behavior is gated to
 VW MEB (CP.brand == 'volkswagen' and CP.flags & VolkswagenFlags.MEB) in the
 controls code, so enabling them has no effect on other platforms.
 
@@ -150,6 +150,40 @@ OPTIONS = [
 
 # Toggles. Fields: param -> (en_title, ko_title, en_desc, ko_desc, icon, category).
 TOGGLES = {
+  "EnableCarrotDecel": (
+    "VW MEB: Carrot-style nav decel (smooth)", "VW MEB: 당근식 내비 감속 (부드럽게)",
+    "VW MEB only: slow down for nav speed cameras / speed bumps / turns purely via the speed cap "
+    "and the MPC (like carrot), instead of injecting a fixed deceleration over the MPC output. "
+    "Smoother, no grab/overshoot. OFF (default) keeps the prior fixed-decel injection so you can "
+    "A/B them. Needs openpilot longitudinal + nav deceleration (Nav deceleration mode).",
+    "VW MEB 전용: 내비 과속카메라 / 방지턱 / 커브 감속을 고정 감속값 주입 대신 속도 캡 + MPC로만 "
+    "처리합니다(당근 방식). 더 부드럽고 그랩/오버슈트가 없습니다. 끄면(기본) 기존 고정 감속 주입 "
+    "방식이라 둘을 비교(A/B)할 수 있습니다. openpilot 종방향 제어 + 내비 감속(내비 감속 모드)이 "
+    "필요합니다.",
+    "speed_limit.png", CAT_SAFETY,
+  ),
+  "EnableDynamicJerkCost": (
+    "Carrot-style lead-jerk response", "당근식 앞차 저크 반응",
+    "Vary the MPC's acceleration-change cost with the lead's jerk (how fast its acceleration is "
+    "changing): smooth behind a steady lead, but react quickly when the lead suddenly brakes or "
+    "accelerates. Ported from carrot. OFF (default) keeps the fixed cost. Needs openpilot "
+    "longitudinal.",
+    "앞차의 저크(가속도 변화 속도)에 따라 MPC의 가속도-변화 비용을 조절합니다: 정속 앞차 뒤에서는 "
+    "부드럽게, 앞차가 갑자기 감속/가속하면 빠르게 반응. 당근에서 가져옴. 끄면(기본) 고정 비용입니다. "
+    "openpilot 종방향 제어가 필요합니다.",
+    "speed_limit.png", CAT_SAFETY,
+  ),
+  "EnableDynamicTFollow": (
+    "Carrot-style dynamic follow gap", "당근식 동적 차간거리",
+    "Vary the follow time by situation: back off a bit when the lead brakes, close up when it "
+    "accelerates, and add a little gap while you are braking. Simplified from carrot (the lead-jerk "
+    "nudge + decel boost only). OFF (default) keeps the fixed per-personality gap. Needs openpilot "
+    "longitudinal.",
+    "상황에 따라 차간 시간을 조절합니다: 앞차가 감속하면 살짝 거리를 벌리고, 가속하면 좁히며, 내가 "
+    "감속 중일 때는 여유를 약간 더 둡니다. 당근에서 핵심만(앞차 저크 보정 + 감속 보정) 간소화. "
+    "끄면(기본) 성격별 고정 차간입니다. openpilot 종방향 제어가 필요합니다.",
+    "chffr_wheel.png", CAT_SAFETY,
+  ),
   "AirConditioner": (
     "VW MEB: A/C temp & pressure (onroad)", "VW MEB: 에어컨 온도·압력 (주행화면)",
     "VW MEB only: show A/C refrigerant pressure (bar) and DC-DC temperature "

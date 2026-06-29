@@ -118,7 +118,7 @@ def print_message_summary(title: str, payload) -> None:
   for speed_idx in range(len(CurvatureDLookup.SPEED_ANCHORS)):
     speed_counts = counts[speed_idx]
     speed_valid = CurvatureDLookup.speed_curve_valid(counts, speed_idx) if has_debug_arrays else bool(np.any(fit_valid[speed_idx]))
-    valid_bucket_count = int(np.count_nonzero(speed_counts >= CurvatureDLookup.MIN_BUCKET_POINTS)) if has_debug_arrays else int(np.count_nonzero(fit_valid[speed_idx]))
+    valid_bucket_count = int(np.count_nonzero(speed_counts >= CurvatureDLookup.MIN_BUCKET_POINTS)) if has_debug_arrays else int(np.count_nonzero(fit_valid[speed_idx]))  # noqa: E501
     total_points = int(round(float(speed_counts.sum()))) if has_debug_arrays else int(np.count_nonzero(fit_valid[speed_idx]))
     if total_points == 0 and not speed_valid:
       continue
