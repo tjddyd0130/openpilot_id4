@@ -233,7 +233,7 @@ class TestCurvatureEstimator:
     speed_idx = len(CurvatureDLookup.SPEED_ANCHORS) - 1
     v_ego = float(CurvatureDLookup.SPEED_ANCHORS[speed_idx])
     required = CurvatureDLookup.required_support_bucket_count(speed_idx)
-    selected_indices = list(range(0, required - 1)) + [required]
+    selected_indices = list(range(required - 1)) + [required]
 
     for bucket_idx in selected_indices:
       desired_curvature = float(CurvatureDLookup.CURVATURE_BUCKET_CENTERS[bucket_idx])

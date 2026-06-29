@@ -15,7 +15,6 @@ are intentionally excluded.
 """
 import fcntl
 import json
-import os
 import socket
 import struct
 import threading
@@ -208,7 +207,7 @@ class TmapMapData(BaseMapData):
           while True:
             try:
               data, addr = sock.recvfrom(4096)
-            except socket.timeout:
+            except TimeoutError:
               continue
             if not data:
               continue

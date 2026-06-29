@@ -23,7 +23,7 @@ class LatControlCurvature(LatControl):
     else:
       self.pid = None
       self.kf = 1.
-      
+
   def set_pid_enabled(self, enabled: bool) -> None:
     self.enable_pid = enabled
 
@@ -47,7 +47,7 @@ class LatControlCurvature(LatControl):
       output_curvature = 0.0
       curvature_log.active = False
       if self.pid is not None:
-        self.pid.reset()      
+        self.pid.reset()
     elif self.pid is None or CS.steeringPressed or not self.enable_pid:
       # no PID or override: feedforward only
       if self.pid is not None:

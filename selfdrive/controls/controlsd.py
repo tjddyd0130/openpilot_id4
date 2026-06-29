@@ -23,7 +23,6 @@ from openpilot.selfdrive.modeld.modeld import LAT_SMOOTH_SECONDS
 from openpilot.selfdrive.locationd.helpers import PoseCalibrator, Pose
 from openpilot.selfdrive.controls.lib.longitudinal_mpc_lib.long_mpc import get_T_FOLLOW
 from openpilot.common.pt2 import PT2Filter
-from openpilot.common.realtime import DT_CTRL
 
 from openpilot.sunnypilot.selfdrive.controls.controlsd_ext import ControlsExt
 
@@ -113,7 +112,7 @@ class Controls(ControlsExt):
       self.enable_long_comfort_mode = self.params.get_bool("EnableLongComfortMode")
       self.disable_car_steer_alerts = self.params.get_bool("DisableCarSteerAlerts")
       self.disable_dm = self.params.get("DisableDM", return_default=True)
-  
+
   def state_control(self):
     CS = self.sm['carState']
 
@@ -233,7 +232,7 @@ class Controls(ControlsExt):
     # Only calibrated (car) frame is relevant for the carcontroller
     CC.currentCurvature = self.curvature
     CC.rollCompensation = self.roll_compensation
-    
+
     if self.calibrated_pose is not None:
       CC.orientationNED = self.calibrated_pose.orientation.xyz.tolist()
       CC.angularVelocity = self.calibrated_pose.angular_velocity.xyz.tolist()
