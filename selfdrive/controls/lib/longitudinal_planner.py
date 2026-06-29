@@ -86,6 +86,10 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
     self._update_meb_long_params()
 
   def _update_meb_long_params(self):
+    # Carrot-style TMAP deceleration toggle (default OFF). ON: camera/bump/turn slowdown is left
+    # entirely to the v_cruise cap + MPC. OFF: the prior fixed-decel injection is applied. Read
+    # unconditionally (the injection itself is a TMAP/MEB no-op otherwise).
+    self.enable_carrot_decel = self.params.get_bool("EnableCarrotDecel")
     # Standstill stopping distance: runtime solver parameter (carrot-style). On MEB read the
     # MebStopDistance param (units of 0.1 m), clamped to a safe 3.0-6.0 m. Non-MEB keeps stock.
     if self.is_meb:
@@ -201,10 +205,15 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
       output_a_target = output_a_target_mpc
       self.output_should_stop = output_should_stop_mpc
 
-    # tjddyd: carrot-style -- TMAP camera/bump/turn deceleration is now handled purely by the
-    # v_cruise cap (update_targets) + the jerk-optimizing MPC, exactly like carrot. The old raw
-    # fixed-decel injection (tmap_decel_accel) bypassed the MPC and caused a step/grab plus a
-    # sub-target overshoot, so it is removed.
+    # tjddyd: TMAP camera/bump/turn deceleration, gated by EnableCarrotDecel (default OFF).
+    #   ON  -> carrot-style: handled purely by the v_cruise cap (update_targets) + jerk-optimizing
+    #          MPC. Smoother, no step/grab/overshoot.
+    #   OFF -> prior behavior: inject the capped fixed decel (tmap_decel_accel) over the MPC output.
+    #          The injection bypasses the MPC and can step/grab, so this is the baseline for A/B.
+    # tmap_decel_accel is a TMAP/MEB no-op when no event is ahead, so this is safe on all platforms.
+    if not self.enable_carrot_decel:
+      output_a_target = LongitudinalPlannerSP.tmap_decel_accel(self, v_ego, output_a_target)
+
     for idx in range(2):
       accel_clip[idx] = np.clip(accel_clip[idx], self.prev_accel_clip[idx] - 0.05, self.prev_accel_clip[idx] + 0.05)
     self.output_a_target = np.clip(output_a_target, accel_clip[0], accel_clip[1])

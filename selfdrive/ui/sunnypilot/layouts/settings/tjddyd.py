@@ -150,6 +150,18 @@ OPTIONS = [
 
 # Toggles. Fields: param -> (en_title, ko_title, en_desc, ko_desc, icon, category).
 TOGGLES = {
+  "EnableCarrotDecel": (
+    "VW MEB: Carrot-style nav decel (smooth)", "VW MEB: 당근식 내비 감속 (부드럽게)",
+    "VW MEB only: slow down for nav speed cameras / speed bumps / turns purely via the speed cap "
+    "and the MPC (like carrot), instead of injecting a fixed deceleration over the MPC output. "
+    "Smoother, no grab/overshoot. OFF (default) keeps the prior fixed-decel injection so you can "
+    "A/B them. Needs openpilot longitudinal + nav deceleration (Nav deceleration mode).",
+    "VW MEB 전용: 내비 과속카메라 / 방지턱 / 커브 감속을 고정 감속값 주입 대신 속도 캡 + MPC로만 "
+    "처리합니다(당근 방식). 더 부드럽고 그랩/오버슈트가 없습니다. 끄면(기본) 기존 고정 감속 주입 "
+    "방식이라 둘을 비교(A/B)할 수 있습니다. openpilot 종방향 제어 + 내비 감속(내비 감속 모드)이 "
+    "필요합니다.",
+    "speed_limit.png", CAT_SAFETY,
+  ),
   "AirConditioner": (
     "VW MEB: A/C temp & pressure (onroad)", "VW MEB: 에어컨 온도·압력 (주행화면)",
     "VW MEB only: show A/C refrigerant pressure (bar) and DC-DC temperature "

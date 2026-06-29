@@ -141,6 +141,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
 	{"EnableCurvatureD", {PERSISTENT, BOOL, "0"}},
 	{"CurvatureDDebugData", {PERSISTENT, BOOL, "0"}},
 	{"EnableLongComfortMode", {PERSISTENT, BOOL}},
+	{"EnableCarrotDecel", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"EnableSmoothSteer", {PERSISTENT, BOOL}},
     {"EnableSpeedLimitControl", {PERSISTENT, BOOL}},
     {"EnableSpeedLimitPredicative", {PERSISTENT, BOOL}},
