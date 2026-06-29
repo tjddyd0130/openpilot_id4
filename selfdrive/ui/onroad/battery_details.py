@@ -103,7 +103,7 @@ class BatteryDetails(Widget):
     label_width = CONFIG.label_width
     text_margin = CONFIG.text_margin
     column_spacing = panel_width // 2 - 40
-    value_width = column_spacing - label_width - text_margin
+    column_spacing - label_width - text_margin
 
     labels = [
       "Capacity:", "Charge:", "SoC:", "Temperature:",
@@ -121,9 +121,7 @@ class BatteryDetails(Widget):
       f"{self._power:.2f} kW",
     ]
 
-    rl.draw_text_ex
-
-    for i, (label, value) in enumerate(zip(labels, values)):
+    for i, (label, value) in enumerate(zip(labels, values, strict=False)):
       column = i // 4
       row = i % 4
 

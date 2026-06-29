@@ -262,7 +262,7 @@ class TestCurvatureEstimator:
 
   def test_outer_learned_buckets_stay_invalid_for_apply(self):
     speed_idx = len(CurvatureDLookup.SPEED_ANCHORS) - 1
-    v_ego = float(CurvatureDLookup.SPEED_ANCHORS[speed_idx])
+    float(CurvatureDLookup.SPEED_ANCHORS[speed_idx])
     outer_idx = len(CurvatureDLookup.CURVATURE_BUCKET_CENTERS) - 1
     counts = np.zeros(CurvatureDLookup.bucket_shape(), dtype=np.float32)
     bias = np.zeros(CurvatureDLookup.bucket_shape(), dtype=np.float32)

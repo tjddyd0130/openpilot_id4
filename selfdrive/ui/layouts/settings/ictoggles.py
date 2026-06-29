@@ -15,7 +15,7 @@ DESCRIPTIONS = {
     "Enables curvature PID post-processing additionally to QFK curvature offset"
   ),
   "EnableCurvatureD": tr_noop(
-    "Learns speed- and curvature-dependent steering corrections around center for dynamic steering behavior. Experimental and only used on curvature-based steering paths."
+    "Learns speed- and curvature-dependent steering corrections around center for dynamic steering behavior. Experimental and only used on curvature-based steering paths."  # noqa: E501
   ),
   "ShowDynamicSteeringLearnerGraph": tr_noop(
     "Display the current dynamic steering learner fit, marker, and status information in the onroad UI."
