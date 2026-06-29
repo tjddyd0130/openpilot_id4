@@ -90,6 +90,10 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
     # entirely to the v_cruise cap + MPC. OFF: the prior fixed-decel injection is applied. Read
     # unconditionally (the injection itself is a TMAP/MEB no-op otherwise).
     self.enable_carrot_decel = self.params.get_bool("EnableCarrotDecel")
+    # carrot-style dynamic MPC tuning (opt-in, default OFF). Set on the MPC, which keeps the flags
+    # across solver resets. Not MEB-gated -- applies to any car running openpilot longitudinal.
+    self.mpc.enable_dynamic_jerk_cost = self.params.get_bool("EnableDynamicJerkCost")
+    self.mpc.enable_dynamic_t_follow = self.params.get_bool("EnableDynamicTFollow")
     # Standstill stopping distance: runtime solver parameter (carrot-style). On MEB read the
     # MebStopDistance param (units of 0.1 m), clamped to a safe 3.0-6.0 m. Non-MEB keeps stock.
     if self.is_meb:

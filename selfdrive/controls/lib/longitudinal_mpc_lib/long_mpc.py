@@ -63,6 +63,26 @@ CRUISE_MIN_ACCEL = -1.2
 CRUISE_MAX_ACCEL = 1.6
 MIN_X_LEAD_FACTOR = 0.5
 
+# --- carrot-style dynamic longitudinal tuning (opt-in, gated by toggles) ----------------
+# Lead jerk is estimated from aLeadK differencing because our radarState has no jLead field.
+J_LEAD_EMA = 0.1                                  # EMA weight on each new lead-jerk sample
+# Dynamic accel-change cost: lower the (a - a_prev) cost when the lead's acceleration is
+# changing fast (react quickly), keep it high (smooth) when the lead is steady. Ported from
+# carrot: np.interp(abs(j_lead), [0.3, 2.0], [A_CHANGE_COST, 20]).
+DYNAMIC_JERK_BP = [0.3, 2.0]                      # |lead jerk| (m/s^3)
+DYNAMIC_A_CHANGE_COST_V = [A_CHANGE_COST, 20.]    # 200 -> 20
+# Dynamic follow time (simplified carrot dynamic_t_follow): nudge t_follow by lead jerk
+# (back off when the lead brakes, close up a little when it accelerates) and add a small gap
+# while the ego itself is braking. Applied on top of the stock personality t_follow.
+DYNAMIC_TF_JERK_BP = [-3.0, -0.5, 0.5, 2.0]       # lead jerk (m/s^3)
+DYNAMIC_TF_JERK_V = [1.0, 0.0, 0.0, -1.0]         # seconds (before gain): + backs off, - closes
+DYNAMIC_TF_GAIN = 0.5
+DYNAMIC_TF_DECEL_BP = [-2.5, -1.0, -0.2, 0.0]     # ego a_ego (m/s^2)
+DYNAMIC_TF_DECEL_V = [0.25, 0.12, 0.02, 0.0]      # seconds added while braking
+DYNAMIC_TF_MIN = 1.0                              # conservative floor (tighter than stock aggressive 1.25 only mildly)
+DYNAMIC_TF_MAX = 2.2
+DYNAMIC_TF_RATE_UP = 0.1 * DT_MDL                 # max t_follow increase per frame (slow ramp, avoids a brake-grab)
+
 def get_jerk_factor(personality=log.LongitudinalPersonality.standard):
   if personality==log.LongitudinalPersonality.relaxed:
     return 1.0
@@ -222,6 +242,10 @@ def gen_long_ocp():
 class LongitudinalMpc:
   def __init__(self, dt=DT_MDL):
     self.dt = dt
+    # carrot-style dynamic tuning toggles, set by the planner from params. Kept here (not in
+    # reset) so a solver-failure reset does not drop them mid-drive.
+    self.enable_dynamic_jerk_cost = False
+    self.enable_dynamic_t_follow = False
     self.solver = AcadosOcpSolverCython(MODEL_NAME, ACADOS_SOLVER_TYPE, N)
     self.reset()
     self.source = LongitudinalPlanSource.cruise
@@ -232,6 +256,12 @@ class LongitudinalMpc:
 
   def reset(self):
     self.solver.reset()
+
+    # carrot-style dynamic tuning state (toggles live in __init__ so they survive a reset)
+    self.j_lead = 0.0
+    self.prev_a_lead = 0.0
+    self.a_change_cost = A_CHANGE_COST
+    self.t_follow_last = get_T_FOLLOW()
 
     self.x_sol = np.zeros((N+1, X_DIM))
     self.u_sol = np.zeros((N, 1))
@@ -279,7 +309,11 @@ class LongitudinalMpc:
 
   def set_weights(self, prev_accel_constraint=True, personality=log.LongitudinalPersonality.standard):
     jerk_factor = get_jerk_factor(personality)
-    a_change_cost = A_CHANGE_COST if prev_accel_constraint else 0
+    # Dynamic accel-change cost (carrot-style) when enabled; self.a_change_cost is refreshed in
+    # update() from the lead-jerk estimate. Falls back to the stock constant when off, and to 0
+    # when there is no prev-accel constraint (standstill/reset), exactly like stock.
+    base_a_change_cost = self.a_change_cost if self.enable_dynamic_jerk_cost else A_CHANGE_COST
+    a_change_cost = base_a_change_cost if prev_accel_constraint else 0
     cost_weights = [X_EGO_OBSTACLE_COST, X_EGO_COST, V_EGO_COST, A_EGO_COST, jerk_factor * a_change_cost, jerk_factor * J_EGO_COST]
     constraint_cost_weights = [LIMIT_COST, LIMIT_COST, LIMIT_COST, DANGER_ZONE_COST]
     self.set_cost_weights(cost_weights, constraint_cost_weights)
@@ -326,7 +360,38 @@ class LongitudinalMpc:
   def update(self, radarstate, v_cruise, personality=log.LongitudinalPersonality.standard):
     t_follow = get_T_FOLLOW(personality)
     v_ego = self.x0[1]
+    a_ego = self.x0[2]
     self.status = radarstate.leadOne.status or radarstate.leadTwo.status
+
+    # carrot-style lead-jerk estimate (no jLead field in our radarState, so difference the
+    # Kalman-filtered lead accel aLeadK and smooth it the same way carrot smooths jLead).
+    if radarstate.leadOne.status:
+      a_lead = float(np.clip(radarstate.leadOne.aLeadK, -10., 5.))
+      j_lead_raw = (a_lead - self.prev_a_lead) / self.dt
+      self.prev_a_lead = a_lead
+      self.j_lead = J_LEAD_EMA * j_lead_raw + (1.0 - J_LEAD_EMA) * self.j_lead
+    else:
+      self.j_lead = 0.0
+      self.prev_a_lead = 0.0
+
+    # #1 dynamic accel-change cost: read by set_weights() next cycle (set_weights runs before
+    # update in the planner, so one frame of lag -- negligible at 20 Hz).
+    if self.enable_dynamic_jerk_cost and radarstate.leadOne.status:
+      self.a_change_cost = float(np.interp(abs(self.j_lead), DYNAMIC_JERK_BP, DYNAMIC_A_CHANGE_COST_V))
+    else:
+      self.a_change_cost = A_CHANGE_COST
+
+    # #2 dynamic follow time: nudge by lead jerk (+ backs off when the lead brakes, - closes up
+    # when it accelerates) and add a small gap while the ego brakes; only ramp UP slowly.
+    if self.enable_dynamic_t_follow:
+      tf = t_follow
+      tf += float(np.interp(self.j_lead, DYNAMIC_TF_JERK_BP, DYNAMIC_TF_JERK_V)) * DYNAMIC_TF_GAIN
+      tf += float(np.interp(a_ego, DYNAMIC_TF_DECEL_BP, DYNAMIC_TF_DECEL_V))
+      tf = float(np.clip(tf, DYNAMIC_TF_MIN, DYNAMIC_TF_MAX))
+      if tf > self.t_follow_last:
+        tf = min(tf, self.t_follow_last + DYNAMIC_TF_RATE_UP)
+      t_follow = tf
+    self.t_follow_last = t_follow
 
     lead_xv_0 = self.process_lead(radarstate.leadOne)
     lead_xv_1 = self.process_lead(radarstate.leadTwo)
